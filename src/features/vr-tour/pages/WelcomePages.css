@@ -1,0 +1,288 @@
+/* ── WelcomePagesDos Space Constellation Styles ── */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Inter:wght@300;400;500;600&display=swap');
+
+.welcome-space-page {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Deep space background */
+  background: radial-gradient(circle at center, #1b2036 0%, #0d101d 60%, #060810 100%);
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+}
+
+/* ── Top Elements ── */
+.space-top-bar {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  right: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 20;
+  animation: fadeIn 2s ease-out 0.3s both;
+}
+
+.top-number {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  color: #e0e4eb;
+  position: relative;
+  padding-bottom: 8px;
+}
+
+.top-number::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.mode-pc-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50px;
+  color: #e0e4eb;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+.mode-pc-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── Clock Background ── */
+.clock-bg-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.clock-face {
+  position: relative;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  animation: clockFadeIn 2s ease-out 0.3s both;
+}
+
+/* Background scattered stars */
+.scattered-stars {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: 
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.8) 100%, transparent),
+    radial-gradient(1px 1px at 80% 40%, rgba(255,255,255,0.6) 100%, transparent),
+    radial-gradient(2px 2px at 40% 70%, rgba(255,255,255,0.9) 100%, transparent),
+    radial-gradient(1px 1px at 70% 90%, rgba(255,255,255,0.4) 100%, transparent),
+    radial-gradient(1px 1px at 25% 60%, rgba(255,255,255,0.7) 100%, transparent),
+    radial-gradient(2px 2px at 85% 15%, rgba(255,240,200,0.8) 100%, transparent);
+  background-size: 100% 100%;
+}
+
+/* ── Main Content ── */
+.space-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: contentFadeIn 2s ease-out 0.3s both;
+}
+
+.center-logo-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.center-logo-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: #e0e4eb;
+  stroke-width: 1;
+}
+
+.space-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 56px;
+  font-weight: 400;
+  letter-spacing: 16px;
+  color: #ffffff;
+  margin: 0;
+  text-transform: uppercase;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  margin-left: 16px; /* Offset for letter-spacing to center visually */
+}
+
+.space-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  margin-top: 12px;
+  margin-bottom: 48px;
+}
+
+/* ── CTA Button (Orange as requested) ── */
+.space-cta-orange {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: none;
+  border-radius: 50px;
+  color: #ffffff;
+  padding: 16px 40px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 
+    0 8px 24px rgba(234, 88, 12, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.space-cta-orange:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 12px 32px rgba(234, 88, 12, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+}
+
+.space-cta-orange:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+}
+
+.cta-play-icon {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cta-play-icon svg {
+  width: 6px;
+  height: 6px;
+  fill: #ffffff;
+  margin-left: 1px;
+}
+
+@keyframes clockFadeIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes contentFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .clock-face {
+    width: 340px;
+    height: 340px;
+  }
+  
+  .space-title {
+    font-size: 36px;
+    letter-spacing: 12px;
+    margin-left: 12px;
+  }
+
+  .space-subtitle {
+    font-size: 11px;
+    letter-spacing: 4px;
+    margin-bottom: 36px;
+  }
+  
+  .center-logo-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 16px;
+  }
+
+  .space-cta-orange {
+    padding: 14px 32px;
+    font-size: 11px;
+  }
+  
+  .space-top-bar {
+    top: 24px;
+    left: 24px;
+    right: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .clock-face {
+    width: 280px;
+    height: 280px;
+  }
+  
+  .space-title {
+    font-size: 28px;
+    letter-spacing: 8px;
+    margin-left: 8px;
+  }
+  
+  .top-number {
+    font-size: 14px;
+  }
+  
+  .mode-pc-btn {
+    padding: 6px 12px;
+    font-size: 10px;
+  }
+}
