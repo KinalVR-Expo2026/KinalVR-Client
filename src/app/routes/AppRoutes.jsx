@@ -1,11 +1,11 @@
 import { Routes, Route } from "react-router-dom";
 import { DashboardPage } from "../layouts/DashboardPage";
-import { WelcomePages } from "../../features/vr-tour/pages/WelcomePages";
+import { WelcomePage } from "../../features/vr-tour/pages/WelcomePage";
 
 export const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<WelcomePages />} />
+      <Route path="/" element={<WelcomePage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
     </Routes>
   );
