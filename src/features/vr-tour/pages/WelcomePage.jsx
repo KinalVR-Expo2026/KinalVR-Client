@@ -45,7 +45,7 @@ const ClockFace = () => {
   }, [radius, numeralRadius]);
 
   return (
-    <div className="h-[280px] w-[280px] rounded-full animate-clock-fade-in md:h-[340px] md:w-[340px] lg:h-[480px] lg:w-[480px]">
+    <div className="h-[360px] w-[360px] rounded-full animate-clock-fade-in md:h-[480px] md:w-[480px] lg:h-[640px] lg:w-[640px]">
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`}>
         <circle cx={radius} cy={radius} r={radius - 12} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
         <circle cx={radius} cy={radius} r={radius - 40} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
