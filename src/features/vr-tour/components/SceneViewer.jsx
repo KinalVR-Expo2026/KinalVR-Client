@@ -1,9 +1,13 @@
 import 'aframe';
+import { useEffect, useState } from 'react';
 import { useState, useEffect } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
+import { EventMarker } from './EventMarker';
 import { getHighResTextureUrl } from '../../../shared/utils/imageUtils';
 import { useTourStore } from '../store/useTourStore';
+
+const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
 
 export const SceneViewer = () => {
   const { 
@@ -14,6 +18,59 @@ export const SceneViewer = () => {
     handleNavigationTransition, 
     cameraRef 
   } = useTourNavigation();
+  const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState(null);
+
+  useEffect(() => {
+    if (!scene || !API_BASE_URL) return undefined;
+
+    const controller = new AbortController();
+    const sceneId = scene._id || scene.idEscenario?._id || scene.idEscenario || scene.subId;
+    console.log("SceneViewer: escenario actual:", scene);
+    console.log("SceneViewer: calculando sceneId:", sceneId);
+
+    const normalizeEvents = (payload) => {
+      if (Array.isArray(payload.events)) return payload.events;
+      if (Array.isArray(payload.eventos)) return payload.eventos;
+      if (Array.isArray(payload)) return payload;
+      return [];
+    };
+
+    const loadEvents = async () => {
+      setEventsLoading(true);
+      setEventsError(null);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/events/escenario/${sceneId}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`No se pudieron cargar los eventos (${response.status})`);
+        }
+
+        const data = await response.json();
+        console.log("Datos de eventos recibidos del servidor:", data);
+        const normalized = normalizeEvents(data);
+        console.log("Eventos normalizados a renderizar:", normalized);
+        setEvents(normalized);
+      } catch (fetchError) {
+        if (fetchError.name === 'AbortError') return;
+        console.error("Error cargando eventos:", fetchError);
+        setEventsError('No se pudieron cargar los eventos de este escenario.');
+        setEvents([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setEventsLoading(false);
+        }
+      }
+    };
+
+    loadEvents();
+
+    return () => controller.abort();
+  }, [scene]);
 
   const isAdminMode = useTourStore((state) => state.isAdminMode);
   const setAdminMode = useTourStore((state) => state.setAdminMode);
@@ -177,6 +234,9 @@ export const SceneViewer = () => {
   }
 
   const textureUrl = getHighResTextureUrl(scene.urlImagen);
+  console.log("Cargando textura de fondo:", textureUrl);
+  const skyAssetId = `sky-${textureUrl.replace(/[^a-zA-Z0-9]/g, '-')}`;
+ 
 
   const [posX, posY, posZ] = selectedConexion ? selectedConexion.position.split(' ').map(Number) : [0, 0, 0];
   const [rotX, rotY, rotZ] = selectedConexion ? selectedConexion.rotation.split(' ').map(Number) : [0, 0, 0];
@@ -329,8 +389,8 @@ export const SceneViewer = () => {
         webxr="referenceSpaceType: local"
       >
         <a-assets></a-assets>
-
-        <a-sky src={textureUrl} rotation="0 -90 0"></a-sky>
+ 
+        <a-sky src={textureUrl} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
 
         <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
           <a-entity 
@@ -363,6 +423,13 @@ export const SceneViewer = () => {
             key={conexion.targetSubId} 
             conexion={conexion} 
             onNavigate={handleNavigationTransition} 
+          />
+        ))}
+
+        {!eventsLoading && !eventsError && events.map((event) => (
+          <EventMarker
+            key={event._id || event.id}
+            event={event}
           />
         ))}
       </a-scene>

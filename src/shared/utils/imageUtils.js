@@ -13,6 +13,7 @@ export const preloadImage = (url) => {
     }
 
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.src = url;
 
     img.onload = () => {
