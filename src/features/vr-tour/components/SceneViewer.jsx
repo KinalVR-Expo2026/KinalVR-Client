@@ -160,6 +160,21 @@ export const SceneViewer = () => {
     };
   }, [isAdminMode, selectedConnectionId, scene, updateConnectionCoords]);
 
+  useEffect(() => {
+    if (scene) {
+      // Force A-Frame raycasters to refresh their objects list when new markers are mounted
+      const timeout = setTimeout(() => {
+        const raycasters = document.querySelectorAll('[raycaster]');
+        raycasters.forEach(el => {
+          if (el.components.raycaster) {
+            el.components.raycaster.refreshObjects();
+          }
+        });
+      }, 150);
+      return () => clearTimeout(timeout);
+    }
+  }, [scene]);
+
   if (loading && !isTransitioning) {
     return (
       <div className="flex h-full w-full items-center justify-center font-[var(--font-sans)] text-white bg-black/50">
@@ -333,13 +348,11 @@ export const SceneViewer = () => {
         <a-sky src={textureUrl} rotation="0 -90 0"></a-sky>
 
         <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
-          <a-entity 
-            camera 
+          <a-entity
+            camera
             ref={cameraRef}
-            look-controls="reverseMouseDrag: false" 
+            look-controls="reverseMouseDrag: false"
             position="0 1.6 0"
-            animation__zoomin="property: camera.fov; to: 20; dur: 350; easing: linear; startEvents: zoomInStart; resumeEvents: zoomInStart"
-            animation__zoomout="property: camera.fov; to: 80; dur: 500; easing: easeOutQuad; startEvents: zoomOutStart; resumeEvents: zoomOutStart"
           ></a-entity>
 
           {/* Soporte para Hand Tracking y Mandos VR (Meta Quest 3S) */}
