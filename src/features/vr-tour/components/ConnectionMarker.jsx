@@ -1,9 +1,16 @@
 import 'aframe';
 import { useEffect, useRef } from 'react';
+import { useTourStore } from '../store/useTourStore';
 import rightArrowImg from '../../../assets/img/right-arrow.png';
 
 export const ConnectionMarker = ({ conexion, onNavigate }) => {
   const markerRef = useRef(null);
+  
+  const isAdminMode = useTourStore((state) => state.isAdminMode);
+  const selectedConnectionId = useTourStore((state) => state.selectedConnectionId);
+  const setSelectedConnectionId = useTourStore((state) => state.setSelectedConnectionId);
+
+  const isSelected = isAdminMode && (selectedConnectionId === conexion.targetSubId);
 
   useEffect(() => {
     const el = markerRef.current;
@@ -11,7 +18,11 @@ export const ConnectionMarker = ({ conexion, onNavigate }) => {
 
     const handleInteraction = (e) => {
       e.stopPropagation();
-      onNavigate(conexion.targetSubId);
+      if (isAdminMode) {
+        setSelectedConnectionId(conexion.targetSubId);
+      } else {
+        onNavigate(conexion.targetSubId);
+      }
     };
 
     // Añadido 'click' para soportar interacciones láser/hand-tracking en VR
@@ -24,7 +35,7 @@ export const ConnectionMarker = ({ conexion, onNavigate }) => {
       el.removeEventListener('mousedown', handleInteraction);
       el.removeEventListener('touchstart', handleInteraction);
     };
-  }, [conexion, onNavigate]);
+  }, [conexion, onNavigate, isAdminMode, setSelectedConnectionId]);
 
   return (
     <a-entity
@@ -52,6 +63,14 @@ export const ConnectionMarker = ({ conexion, onNavigate }) => {
         color="#FFFFFF"
         scale="0.8 0.8 0.8"
       ></a-text>
+
+      {isSelected && (
+        <a-entity
+          geometry="primitive: sphere; radius: 0.35"
+          material="color: #ea580c; wireframe: true; opacity: 0.8; transparent: true"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
+        ></a-entity>
+      )}
     </a-entity>
   );
 };
