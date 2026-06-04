@@ -7,8 +7,8 @@ export const useTourNavigation = () => {
   const fetchSceneData = useTourStore((state) => state.fetchSceneData);
   const preloadAdjacentScenes = useTourStore((state) => state.preloadAdjacentScenes);
   
-  const [scene, setScene] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const scene = useTourStore((state) => state.scenesCache[activeSubId]);
+  const [loading, setLoading] = useState(!scene);
 
   const [pendingNextSubId, setPendingNextSubId] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -21,14 +21,12 @@ export const useTourNavigation = () => {
     let isMounted = true;
     const loadScene = async () => {
       if (activeSubId === pendingNextSubId) return;
-      if (!isTransitioning) setLoading(true); 
+      if (!scene && !isTransitioning) setLoading(true); 
 
       try {
         const data = await fetchSceneData(activeSubId);
         
         if (isMounted && data) {
-          setScene(data);
-
           if (!previousSubId.current && data.subId === 'entrada') {
             setCameraYaw(180);
           }
@@ -47,7 +45,7 @@ export const useTourNavigation = () => {
     loadScene();
 
     return () => { isMounted = false; };
-  }, [activeSubId, fetchSceneData, preloadAdjacentScenes, pendingNextSubId, isTransitioning]);
+  }, [activeSubId, fetchSceneData, preloadAdjacentScenes, pendingNextSubId, isTransitioning, scene]);
 
   const handleNavigationTransition = useCallback((targetId) => {
     if (!cameraRef.current || isTransitioning) return;
@@ -66,10 +64,10 @@ export const useTourNavigation = () => {
       
       if (animationName === 'animation__zoomin') {
         if (pendingNextSubId) {
-          const nextScene = useTourStore.getState().scenesCache[pendingNextSubId];
+          const nextScene = useTourStore.getState().scenesCache[pendingNextSubId.trim()];
           
           if (nextScene && nextScene.conexiones) {
-            const backConnection = nextScene.conexiones.find(c => c.targetSubId === activeSubId);
+            const backConnection = nextScene.conexiones.find(c => c.targetSubId?.trim() === activeSubId?.trim());
             
             if (backConnection && backConnection.rotation) {
               const yRot = parseFloat(backConnection.rotation.split(' ')[1]);
