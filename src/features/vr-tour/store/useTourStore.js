@@ -7,10 +7,12 @@ export const useTourStore = create((set, get) => ({
   scenesCache: {},
   isAdminMode: false,
   selectedConnectionId: null,
+  selectedEventId: null,
 
   setActiveSubId: (subId) => set({ activeSubId: subId ? subId.trim() : subId }),
-  setAdminMode: (isAdmin) => set({ isAdminMode: isAdmin, selectedConnectionId: null }),
-  setSelectedConnectionId: (id) => set({ selectedConnectionId: id ? id.trim() : id }),
+  setAdminMode: (isAdmin) => set({ isAdminMode: isAdmin, selectedConnectionId: null, selectedEventId: null }),
+  setSelectedConnectionId: (id) => set({ selectedConnectionId: id ? id.trim() : id, selectedEventId: null }),
+  setSelectedEventId: (id) => set({ selectedEventId: id ? id.trim() : id, selectedConnectionId: null }),
 
   fetchSceneData: async (subId) => {
     const trimmedSubId = subId ? subId.trim() : subId;
