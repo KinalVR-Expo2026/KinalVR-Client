@@ -7,10 +7,30 @@ export const useTourStore = create((set, get) => ({
   scenesCache: {},
   isAdminMode: false,
   selectedConnectionId: null,
+  
+  preloadedImages: [], 
 
   setActiveSubId: (subId) => set({ activeSubId: subId ? subId.trim() : subId }),
   setAdminMode: (isAdmin) => set({ isAdminMode: isAdmin, selectedConnectionId: null }),
   setSelectedConnectionId: (id) => set({ selectedConnectionId: id ? id.trim() : id }),
+
+  preloadInitialScene: async (subId) => {
+    const { fetchSceneData, preloadAdjacentScenes } = get();
+    const scene = await fetchSceneData(subId);
+    
+    if (scene) {
+      if (scene.urlImagen) {
+        const url = getHighResTextureUrl(scene.urlImagen);
+        preloadImage(url).catch(() => {});
+        set((state) => ({
+          preloadedImages: [...new Set([...state.preloadedImages, url])]
+        }));
+      }
+      if (scene.conexiones && scene.conexiones.length > 0) {
+        preloadAdjacentScenes(scene.conexiones);
+      }
+    }
+  },
 
   fetchSceneData: async (subId) => {
     const trimmedSubId = subId ? subId.trim() : subId;
@@ -40,6 +60,10 @@ export const useTourStore = create((set, get) => ({
       if (sceneData && sceneData.urlImagen) {
         const textureUrl = getHighResTextureUrl(sceneData.urlImagen);
         preloadImage(textureUrl).catch(() => { });
+        
+        set((state) => ({
+          preloadedImages: [...new Set([...state.preloadedImages, textureUrl])]
+        }));
       }
     });
   },
