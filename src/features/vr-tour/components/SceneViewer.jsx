@@ -1,6 +1,5 @@
 import 'aframe';
 import { useEffect, useState } from 'react';
-import { useState, useEffect } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
