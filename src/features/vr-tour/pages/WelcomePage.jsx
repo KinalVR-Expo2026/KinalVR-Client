@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';import { useNavigate } from 'react-router-dom';
+import { useTourStore } from '../store/useTourStore';
 
 const NUMERALS = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
@@ -139,6 +139,11 @@ const HeroContent = ({ onStart }) => {
 
 export const WelcomePage = () => {
   const navigate = useNavigate();
+  const preloadInitialScene = useTourStore((state) => state.preloadInitialScene);
+
+  useEffect(() => {
+    preloadInitialScene('entrada');
+  }, [preloadInitialScene]);
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,_#1b2036_0%,_#0d101d_60%,_#060810_100%)] font-[var(--font-sans)] text-white">
