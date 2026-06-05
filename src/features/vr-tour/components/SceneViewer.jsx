@@ -1,5 +1,5 @@
 import 'aframe';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
@@ -11,15 +11,14 @@ const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
 
 const generateAssetId = (url) => {
   if (!url) return 'default-sky';
-  // Identificamos si la URL corresponde a la imagen desenfocada
   const isLowRes = url.includes('e_blur');
   const type = isLowRes ? 'low' : 'high';
-  
-  // Agregamos el prefijo 'low' o 'high' para garantizar que los IDs jamás choquen
   return `asset-${type}-${url.replace(/[^a-zA-Z0-9]/g, '').slice(-35)}`;
 };
 
 export const SceneViewer = () => {
+  const wrapperRef = useRef(null);
+  const sceneRef = useRef(null);
   const {
     scene,
     loading,
@@ -39,8 +38,6 @@ export const SceneViewer = () => {
 
     const controller = new AbortController();
     const sceneId = scene._id || scene.idEscenario?._id || scene.idEscenario || scene.subId;
-    console.log("SceneViewer: escenario actual:", scene);
-    console.log("SceneViewer: calculando sceneId:", sceneId);
 
     const normalizeEvents = (payload) => {
       if (Array.isArray(payload.events)) return payload.events;
@@ -63,9 +60,7 @@ export const SceneViewer = () => {
         }
 
         const data = await response.json();
-        console.log("Datos de eventos recibidos del servidor:", data);
         const normalized = normalizeEvents(data);
-        console.log("Eventos normalizados a renderizar:", normalized);
         setEvents(normalized);
       } catch (fetchError) {
         if (fetchError.name === 'AbortError') return;
@@ -95,9 +90,55 @@ export const SceneViewer = () => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
-  const [saveType, setSaveType] = useState(''); // 'success' | 'error'
+  const [saveType, setSaveType] = useState('');
   const [modalEvent, setModalEvent] = useState(null);
   const [activeSkyAssetId, setActiveSkyAssetId] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const updateFullscreenState = () => {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
+      setIsFullscreen(fullscreenElement === wrapperRef.current);
+    };
+
+    updateFullscreenState();
+    document.addEventListener('fullscreenchange', updateFullscreenState);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenState);
+    document.addEventListener('mozfullscreenchange', updateFullscreenState);
+    document.addEventListener('MSFullscreenChange', updateFullscreenState);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', updateFullscreenState);
+      document.removeEventListener('webkitfullscreenchange', updateFullscreenState);
+      document.removeEventListener('mozfullscreenchange', updateFullscreenState);
+      document.removeEventListener('MSFullscreenChange', updateFullscreenState);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const wrapperEl = wrapperRef.current;
+    if (!wrapperEl) return;
+
+    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
+
+    if (fullscreenElement === wrapperEl) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        await document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        await document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        await document.msExitFullscreen();
+      }
+      return;
+    }
+
+    const request = wrapperEl.requestFullscreen || wrapperEl.webkitRequestFullscreen || wrapperEl.mozRequestFullScreen || wrapperEl.msRequestFullscreen;
+    if (!request) return;
+
+    await request.call(wrapperEl, { navigationUI: 'hide' });
+  };
 
   useEffect(() => {
     if (!scene) return;
@@ -109,21 +150,17 @@ export const SceneViewer = () => {
     const lowResId = generateAssetId(lowResUrl);
     const highResId = generateAssetId(highResUrl);
 
-    // ¿La imagen ya está en memoria (ya sea porque pasamos por aquí o se precargó)?
     if (isImageCached(highResUrl)) {
-      // ¡Esquivamos la imagen borrosa y cargamos full HD de inmediato!
       setActiveSkyAssetId(highResId);
       return; 
     }
 
-    // Si no está, aplicamos la carga progresiva
     setActiveSkyAssetId(lowResId);
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = highResUrl;
     img.onload = () => {
-      // Registramos que ya se descargó para futuras visitas
       setAsCached(highResUrl);
       if (isMounted) {
         setActiveSkyAssetId(highResId);
@@ -135,7 +172,6 @@ export const SceneViewer = () => {
     };
   }, [scene]);
 
-  // Actualizamos los assets que necesita procesar A-Frame
   const allAssetsToLoad = useMemo(() => {
     if (!scene) return preloadedImages;
     const lowResUrl = getLowResTextureUrl(scene.urlImagen);
@@ -337,7 +373,6 @@ export const SceneViewer = () => {
     };
   }, [isAdminMode, selectedConnectionId, scene, updateConnectionCoords]);
 
-  // Keyboard controls for selected event (edit position/rotation)
   useEffect(() => {
     if (!isAdminMode || !selectedEvent) return;
 
@@ -437,7 +472,6 @@ export const SceneViewer = () => {
   }
 
   const textureUrl = getHighResTextureUrl(scene.urlImagen);
-  console.log("Cargando textura de fondo:", textureUrl);
   const skyAssetId = generateAssetId(textureUrl);
 
   const [posX, posY, posZ] = selectedConexion ? selectedConexion.position.split(' ').map(Number) : [0, 0, 0];
@@ -473,8 +507,7 @@ export const SceneViewer = () => {
   };
 
   return (
-    <div className="h-full w-full relative">
-      {/* Botón Modo Admin - Top Right */}
+    <div ref={wrapperRef} className="h-full w-full relative">
       <div className="absolute top-6 right-6 z-40 flex flex-col items-end gap-2">
         <button
           type="button"
@@ -493,9 +526,19 @@ export const SceneViewer = () => {
           </svg>
           {isAdminMode ? 'Salir Admin' : 'Modo Admin'}
         </button>
+        <button
+          type="button"
+          onClick={() => { toggleFullscreen().catch(() => {}); }}
+          title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/45 text-[#e0e4eb] shadow-[0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all duration-300 cursor-pointer hover:border-white/30 hover:bg-white/5"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d={isFullscreen ? 'M9 9H5V5m10 0h4v4M5 15h4v4m10-4h-4v4' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3M8 21H5a2 2 0 01-2-2v-3m18 0v3a2 2 0 01-2 2h-3'} />
+          </svg>
+        </button>
       </div>
 
-      {/* Alerta Modo Admin - Top Center */}
       {isAdminMode && (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
           <div className="flex items-center gap-2 rounded-full border border-red-500/30 bg-red-950/50 backdrop-blur-md px-4 py-1.5 text-[9px] font-semibold uppercase tracking-[2px] text-red-400 shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
@@ -508,7 +551,6 @@ export const SceneViewer = () => {
         </div>
       )}
 
-      {/* Panel de Control - Bottom Center */}
       {isAdminMode && (selectedConexion || selectedEvent) && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-3xl rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl p-4 shadow-[0_12px_40px_rgba(0,0,0,0.75)] animate-fade-in flex flex-col lg:flex-row gap-4 justify-between">
           <div className="flex-1 flex flex-col gap-3">
@@ -531,7 +573,6 @@ export const SceneViewer = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {/* Posición */}
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-bold tracking-wider text-orange-500 uppercase">Posición (x, y, z)</span>
                 <div className="flex flex-wrap gap-2.5">
@@ -571,7 +612,6 @@ export const SceneViewer = () => {
                 </div>
               </div>
 
-              {/* Rotación */}
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-bold tracking-wider text-orange-500 uppercase">Rotación (x, y, z)</span>
                 <div className="flex flex-wrap gap-2.5">
@@ -584,7 +624,6 @@ export const SceneViewer = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row lg:flex-col justify-between gap-3 lg:w-72 border-t lg:border-t-0 lg:border-l border-white/5 pt-3 lg:pt-0 lg:pl-4">
-            {/* Guía Rápida */}
             <div className="rounded-lg border border-white/5 bg-slate-900/40 p-2 text-[9px] text-white/50 flex-1">
               <span className="block font-semibold text-white/70 uppercase tracking-wider mb-1">Guía Teclado</span>
               <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
@@ -595,7 +634,6 @@ export const SceneViewer = () => {
               </div>
             </div>
 
-            {/* Acción de Guardar */}
             <div className="flex flex-col gap-1.5 justify-end">
               {saveMessage && (
                 <span className={`text-[10px] font-medium text-center ${saveType === 'success' ? 'text-green-400' : 'text-red-400'}`}>
@@ -616,15 +654,16 @@ export const SceneViewer = () => {
       )}
 
       <a-scene
+        ref={sceneRef}
         embedded
         antialias="true"
         style={{ width: '100%', height: '100%' }}
         cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
+        xr-mode-ui="enterVREnabled: false; enterAREnabled: false"
         webxr="referenceSpaceType: local"
       >
         <a-assets timeout="10000">
-          {/* Cargar todos los assets precargados */}
           {allAssetsToLoad.map((url) => (
             <img 
               key={generateAssetId(url)} 
@@ -635,7 +674,6 @@ export const SceneViewer = () => {
           ))}
         </a-assets>
  
-        {/* Usamos el ID del asset activo. Empezará borroso y se volverá nítido. */}
         <a-sky src={activeSkyAssetId ? `#${activeSkyAssetId}` : ''} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
 
         <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
@@ -648,7 +686,6 @@ export const SceneViewer = () => {
             animation__zoomout="property: camera.fov; to: 80; dur: 500; easing: easeOutQuad; startEvents: zoomOutStart; resumeEvents: zoomOutStart"
           ></a-entity>
 
-          {/* Soporte para Hand Tracking y Mandos VR (Meta Quest 3S) */}
           <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
           <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
           <a-entity hand-tracking-controls="hand: left"></a-entity>
@@ -671,13 +708,20 @@ export const SceneViewer = () => {
         ))}
       </a-scene>
 
-      {/* Modal para ver imagen del evento */}
       {modalEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="max-w-4xl w-full bg-slate-900 rounded-lg overflow-hidden shadow-lg flex">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 cursor-pointer"
+          onClick={() => setModalEvent(null)}
+        >
+          <div className="max-w-4xl w-full bg-slate-900 rounded-lg overflow-hidden shadow-lg flex cursor-pointer">
             <div className="w-2/3 bg-black flex items-center justify-center">
               {modalEvent.urlImagen ? (
-                <img src={modalEvent.urlImagen} alt="Evento" className="max-h-[80vh] object-contain" />
+                <img
+                  src={modalEvent.urlImagen}
+                  alt="Evento"
+                  className="max-h-[80vh] object-contain"
+                  crossOrigin="anonymous"
+                />
               ) : (
                 <div className="p-8 text-white/60">Sin imagen</div>
               )}
@@ -686,9 +730,6 @@ export const SceneViewer = () => {
               <h3 className="text-sm font-semibold">Descripción</h3>
               <div className="text-[13px] text-white/80 overflow-auto max-h-[70vh]">
                 {modalEvent.descripcion || 'Sin descripción'}
-              </div>
-              <div className="mt-auto flex gap-2">
-                <button onClick={() => setModalEvent(null)} className="ml-auto rounded bg-white/10 px-3 py-2 text-sm hover:bg-white/20 transition-all cursor-pointer">Cerrar</button>
               </div>
             </div>
           </div>
