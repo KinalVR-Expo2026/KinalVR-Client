@@ -7,9 +7,9 @@ export const useTourStore = create((set, get) => ({
   scenesCache: {},
   isAdminMode: false,
   selectedConnectionId: null,
+  selectedEventId: null,
   
   preloadedImages: [], 
-  selectedEventId: null,
 
   setActiveSubId: (subId) => set({ activeSubId: subId ? subId.trim() : subId }),
   setAdminMode: (isAdmin) => set({ isAdminMode: isAdmin, selectedConnectionId: null, selectedEventId: null }),

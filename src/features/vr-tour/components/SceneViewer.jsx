@@ -646,6 +646,31 @@ const skyAssetId = generateAssetId(textureUrl);
           </div>
         </div>
       )}
+      <a-scene 
+        embedded 
+        antialias="true" 
+        style={{ width: '100%', height: '100%' }} 
+        cursor="rayOrigin: mouse" 
+        raycaster="objects: .clickable"
+        webxr="referenceSpaceType: local"
+      >
+        <a-assets timeout="3000">
+          {allAssetsToLoad.map((url) => (
+            <img 
+              key={generateAssetId(url)} 
+              id={generateAssetId(url)} 
+              src={url} 
+              crossOrigin="anonymous" 
+            />
+          ))}
+        </a-assets>
+ 
+        <a-sky src={`#${skyAssetId}`} rotation="0 -90 0"></a-sky>
+
+        <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
+        </a-entity>
+
+      </a-scene>
     </div>
   );
 };
