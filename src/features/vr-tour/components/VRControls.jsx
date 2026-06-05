@@ -3,7 +3,7 @@ import 'aframe';
 
 // Registramos componentes personalizados de A-Frame fuera de React para evitar re-registros
 if (typeof AFRAME !== 'undefined') {
-  
+
   // 1. Giro con los joysticks físicos (Snap Turn para mandos VR)
   if (!AFRAME.components['thumbstick-turning']) {
     AFRAME.registerComponent('thumbstick-turning', {
@@ -14,11 +14,11 @@ if (typeof AFRAME !== 'undefined') {
       init: function () {
         this.rig = document.querySelector(this.data.rigSelector);
         this.isTurning = false;
-        
+
         this.el.addEventListener('thumbstickmoved', (evt) => {
           if (!this.rig) return;
           const x = evt.detail.x;
-          
+
           if (x > 0.6 && !this.isTurning) {
             this.rig.object3D.rotation.y -= THREE.MathUtils.degToRad(this.data.turnAngle);
             this.isTurning = true;
@@ -64,7 +64,7 @@ if (typeof AFRAME !== 'undefined') {
         this.rig = document.querySelector(this.data.rigSelector);
         this.isJoySticking = false;
         this.pinchCenterX = 0;
-        
+
         this.el.addEventListener('pinchstarted', () => {
           // Si estamos apuntando a una flecha u objeto, es un click normal, no activamos el joystick
           const raycaster = this.el.components.raycaster;
@@ -74,7 +74,7 @@ if (typeof AFRAME !== 'undefined') {
           // Guardamos el punto central del joystick virtual (la posición de la mano al empezar)
           this.pinchCenterX = this.el.object3D.position.x;
         });
-        
+
         this.el.addEventListener('pinchended', () => {
           this.isJoySticking = false;
         });
@@ -83,14 +83,14 @@ if (typeof AFRAME !== 'undefined') {
         if (this.isJoySticking && this.rig) {
           const currentX = this.el.object3D.position.x;
           const deltaX = currentX - this.pinchCenterX; // Distancia desde el centro del joystick
-          
+
           // Si la mano se mueve más allá de la zona muerta, empezamos a rotar
           if (Math.abs(deltaX) > this.data.deadzone) {
             // El giro es continuo y la velocidad depende de qué tan lejos muevas la mano del centro
             const rotationSpeed = (deltaX > 0 ? deltaX - this.data.deadzone : deltaX + this.data.deadzone);
             // Multiplicamos por la velocidad y ajustamos por el framerate
             const turnAmount = rotationSpeed * this.data.speed * (timeDelta / 16.666);
-            this.rig.object3D.rotation.y -= turnAmount; 
+            this.rig.object3D.rotation.y -= turnAmount;
           }
         }
       }
@@ -118,7 +118,7 @@ if (typeof AFRAME !== 'undefined') {
         } else {
           applyVisibility(false);
         }
-        
+
         this.onEnterVR = () => applyVisibility(true);
         this.onExitVR = () => applyVisibility(false);
 
@@ -154,32 +154,24 @@ export const VRControls = ({ cameraRef, cameraYaw }) => {
         position="0 1.6 0"
       ></a-entity>
 
-      {/* Mandos Físicos VR (Meta Quest, etc) */}
+      {/* Mano Izquierda: Mandos Físicos y Hand Tracking combinados */}
       <a-entity
+        hand-tracking-controls="hand: left"
         laser-controls="hand: left"
         raycaster="objects: .clickable; far: 50"
         vr-only-line="color: #f97316; opacity: 0.7"
         thumbstick-turning="turnAngle: 45"
+        hand-pinch-click
+        hand-joystick-turn="speed: 1.5; deadzone: 0.02"
       ></a-entity>
+
+      {/* Mano Derecha: Mandos Físicos y Hand Tracking combinados */}
       <a-entity
+        hand-tracking-controls="hand: right"
         laser-controls="hand: right"
         raycaster="objects: .clickable; far: 50"
         vr-only-line="color: #f97316; opacity: 0.7"
         thumbstick-turning="turnAngle: 45"
-      ></a-entity>
-
-      {/* Hand Tracking (Meta Quest 3S) - Locomoción de Joystick Virtual */}
-      <a-entity 
-        hand-tracking-controls="hand: left"
-        raycaster="objects: .clickable; far: 50"
-        vr-only-line="color: #3b82f6; opacity: 0.5"
-        hand-pinch-click
-        hand-joystick-turn="speed: 1.5; deadzone: 0.02"
-      ></a-entity>
-      <a-entity 
-        hand-tracking-controls="hand: right"
-        raycaster="objects: .clickable; far: 50"
-        vr-only-line="color: #3b82f6; opacity: 0.5"
         hand-pinch-click
         hand-joystick-turn="speed: 1.5; deadzone: 0.02"
       ></a-entity>
