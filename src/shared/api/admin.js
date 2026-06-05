@@ -13,3 +13,8 @@ export const updateScene = async (id, data) => {
   const response = await axiosAdmin.put(`/scenes/${id}`, data);
   return response.data.scene;
 };
+
+export const updateEvent = async (id, data) => {
+  const response = await axiosAdmin.put(`/events/${id}`, data);
+  return response.data.event;
+};

@@ -5,6 +5,7 @@ import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
 import { getHighResTextureUrl } from '../../../shared/utils/imageUtils';
 import { useTourStore } from '../store/useTourStore';
+import { updateEvent as apiUpdateEvent } from '../../../shared/api/admin';
 
 const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
 
@@ -82,16 +83,31 @@ export const SceneViewer = () => {
   const setAdminMode = useTourStore((state) => state.setAdminMode);
   const selectedConnectionId = useTourStore((state) => state.selectedConnectionId);
   const setSelectedConnectionId = useTourStore((state) => state.setSelectedConnectionId);
+  const selectedEventId = useTourStore((state) => state.selectedEventId);
+  const setSelectedEventId = useTourStore((state) => state.setSelectedEventId);
   const updateConnectionCoords = useTourStore((state) => state.updateConnectionCoords);
   const saveSceneConnections = useTourStore((state) => state.saveSceneConnections);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveType, setSaveType] = useState(''); // 'success' | 'error'
+  const [modalEvent, setModalEvent] = useState(null);
 
   const selectedConexion = scene?.conexiones.find(
     (c) => c.targetSubId === selectedConnectionId
   );
+
+  const selectedEvent = events.find(ev => (ev._id || ev.id) === selectedEventId);
+
+  const updateEventCoords = (eventId, { position, rotation }) => {
+    setEvents((prev) => prev.map((ev) => {
+      const id = ev._id || ev.id;
+      if (id === eventId) {
+        return { ...ev, position: position !== undefined ? position : ev.position, rotation: rotation !== undefined ? rotation : ev.rotation };
+      }
+      return ev;
+    }));
+  };
 
   const handleCoordChange = (type, axis, value) => {
     if (!selectedConexion || !scene) return;
@@ -120,6 +136,33 @@ export const SceneViewer = () => {
     });
   };
 
+  const handleEventCoordChange = (type, axis, value) => {
+    if (!selectedEvent) return;
+    const [posX, posY, posZ] = (selectedEvent.position || '0 0 0').split(' ').map(Number);
+    const [rotX, rotY, rotZ] = (selectedEvent.rotation || '0 0 0').split(' ').map(Number);
+
+    let newPos = [posX, posY, posZ];
+    let newRot = [rotX, rotY, rotZ];
+
+    const val = parseFloat(value);
+    if (isNaN(val)) return;
+
+    if (type === 'position') {
+      if (axis === 'x') newPos[0] = val;
+      if (axis === 'y') newPos[1] = val;
+      if (axis === 'z') newPos[2] = val;
+    } else {
+      if (axis === 'x') newRot[0] = val;
+      if (axis === 'y') newRot[1] = val;
+      if (axis === 'z') newRot[2] = val;
+    }
+
+    updateEventCoords(selectedEvent._id || selectedEvent.id, {
+      position: `${newPos[0].toFixed(3)} ${newPos[1].toFixed(3)} ${newPos[2].toFixed(3)}`,
+      rotation: `${newRot[0]} ${newRot[1]} ${newRot[2]}`
+    });
+  };
+
   const handleSave = async () => {
     if (!scene) return;
     setIsSaving(true);
@@ -132,6 +175,27 @@ export const SceneViewer = () => {
     } catch (err) {
       setSaveType('error');
       setSaveMessage('Error al guardar en base de datos');
+      setTimeout(() => setSaveMessage(''), 4000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEventSave = async () => {
+    if (!selectedEvent) return;
+    setIsSaving(true);
+    setSaveMessage('');
+    try {
+      const id = selectedEvent._id || selectedEvent.id;
+      const payload = { position: selectedEvent.position, rotation: selectedEvent.rotation };
+      await apiUpdateEvent(id, payload);
+      setSaveType('success');
+      setSaveMessage('Evento guardado exitosamente en MongoDB');
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch (err) {
+      console.error('Error guardando evento:', err);
+      setSaveType('error');
+      setSaveMessage('Error al guardar evento en base de datos');
       setTimeout(() => setSaveMessage(''), 4000);
     } finally {
       setIsSaving(false);
@@ -237,6 +301,88 @@ export const SceneViewer = () => {
       return () => clearTimeout(timeout);
     }
   }, [scene]);
+  // Keyboard controls for selected event (edit position/rotation)
+  useEffect(() => {
+    if (!isAdminMode || !selectedEvent) return;
+
+    const handleKeyDown = (e) => {
+      if (
+        document.activeElement.tagName === 'INPUT' ||
+        document.activeElement.tagName === 'TEXTAREA'
+      ) {
+        return;
+      }
+
+      const [posValX, posValY, posValZ] = (selectedEvent.position || '0 0 0').split(' ').map(Number);
+      const [rotValX, rotValY, rotValZ] = (selectedEvent.rotation || '0 0 0').split(' ').map(Number);
+
+      let x = posValX;
+      let y = posValY;
+      let z = posValZ;
+      let rx = rotValX;
+      let ry = rotValY;
+      let rz = rotValZ;
+
+      const posStep = 0.05;
+      const rotStep = 5;
+      let changed = false;
+
+      if (e.shiftKey) {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          ry = (ry - rotStep) % 360;
+          changed = true;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          ry = (ry + rotStep) % 360;
+          changed = true;
+        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+          rx = (rx - rotStep) % 360;
+          changed = true;
+        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+          rx = (rx + rotStep) % 360;
+          changed = true;
+        } else if (e.key === 'q' || e.key === 'Q') {
+          rz = (rz - rotStep) % 360;
+          changed = true;
+        } else if (e.key === 'e' || e.key === 'E') {
+          rz = (rz + rotStep) % 360;
+          changed = true;
+        }
+      } else {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          x -= posStep;
+          changed = true;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          x += posStep;
+          changed = true;
+        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+          z -= posStep;
+          changed = true;
+        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+          z += posStep;
+          changed = true;
+        } else if (e.key === 'PageUp' || e.key === 'q' || e.key === 'Q') {
+          y += posStep;
+          changed = true;
+        } else if (e.key === 'PageDown' || e.key === 'e' || e.key === 'E') {
+          y -= posStep;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        e.preventDefault();
+        updateEventCoords(selectedEvent._id || selectedEvent.id, {
+          position: `${x.toFixed(3)} ${y.toFixed(3)} ${z.toFixed(3)}`,
+          rotation: `${rx} ${ry} ${rz}`
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAdminMode, selectedEvent]);
 
   if (loading && !isTransitioning) {
     return (
@@ -330,17 +476,21 @@ const skyAssetId = generateAssetId(textureUrl);
       )}
 
       {/* Panel de Control - Bottom Center */}
-      {isAdminMode && selectedConexion && (
+      {isAdminMode && (selectedConexion || selectedEvent) && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-3xl rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl p-4 shadow-[0_12px_40px_rgba(0,0,0,0.75)] animate-fade-in flex flex-col lg:flex-row gap-4 justify-between">
           <div className="flex-1 flex flex-col gap-3">
             <div className="flex justify-between items-center border-b border-white/5 pb-2">
               <div>
-                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Ajustar Conexión</h3>
-                <p className="text-[10px] text-white/50">Hacia: <span className="text-orange-400 font-mono font-medium">{selectedConexion.targetSubId}</span></p>
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">{selectedConexion ? 'Ajustar Conexión' : 'Ajustar Evento'}</h3>
+                {selectedConexion ? (
+                  <p className="text-[10px] text-white/50">Hacia: <span className="text-orange-400 font-mono font-medium">{selectedConexion.targetSubId}</span></p>
+                ) : (
+                  <p className="text-[10px] text-white/50">Evento: <span className="text-orange-400 font-mono font-medium">{(selectedEvent && (selectedEvent._id || selectedEvent.id)) || '—'}</span></p>
+                )}
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedConnectionId(null)}
+                onClick={() => { selectedConexion ? setSelectedConnectionId(null) : setSelectedEventId(null); }}
                 className="text-[10px] text-white/40 hover:text-white border border-white/10 hover:border-white/20 rounded px-2 py-0.5 transition-all cursor-pointer"
               >
                 Cerrar
@@ -352,9 +502,39 @@ const skyAssetId = generateAssetId(textureUrl);
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-bold tracking-wider text-orange-500 uppercase">Posición (x, y, z)</span>
                 <div className="flex flex-wrap gap-2.5">
-                  {renderCoordinateInput('position', 'x', posX, 0.05)}
-                  {renderCoordinateInput('position', 'y', posY, 0.05)}
-                  {renderCoordinateInput('position', 'z', posZ, 0.05)}
+                  {selectedConexion ? (
+                    <>
+                      {renderCoordinateInput('position', 'x', posX, 0.05)}
+                      {renderCoordinateInput('position', 'y', posY, 0.05)}
+                      {renderCoordinateInput('position', 'z', posZ, 0.05)}
+                    </>
+                  ) : (
+                    (() => {
+                      const [epx, epy, epz] = selectedEvent ? (selectedEvent.position || '0 0 0').split(' ').map(Number) : [0,0,0];
+                      return (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <span className="w-3 text-center text-[10px] font-bold text-white/40 uppercase">x</span>
+                            <button type="button" onClick={() => handleEventCoordChange('position','x', epx - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
+                            <input type="number" step={0.05} value={isNaN(epx) ? 0 : Number(epx.toFixed(3))} onChange={(e) => handleEventCoordChange('position','x', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
+                            <button type="button" onClick={() => handleEventCoordChange('position','x', epx + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="w-3 text-center text-[10px] font-bold text-white/40 uppercase">y</span>
+                            <button type="button" onClick={() => handleEventCoordChange('position','y', epy - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
+                            <input type="number" step={0.05} value={isNaN(epy) ? 0 : Number(epy.toFixed(3))} onChange={(e) => handleEventCoordChange('position','y', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
+                            <button type="button" onClick={() => handleEventCoordChange('position','y', epy + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="w-3 text-center text-[10px] font-bold text-white/40 uppercase">z</span>
+                            <button type="button" onClick={() => handleEventCoordChange('position','z', epz - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
+                            <input type="number" step={0.05} value={isNaN(epz) ? 0 : Number(epz.toFixed(3))} onChange={(e) => handleEventCoordChange('position','z', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
+                            <button type="button" onClick={() => handleEventCoordChange('position','z', epz + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
+                          </div>
+                        </>
+                      );
+                    })()
+                  )}
                 </div>
               </div>
 
@@ -392,7 +572,7 @@ const skyAssetId = generateAssetId(textureUrl);
               <button
                 type="button"
                 disabled={isSaving}
-                onClick={handleSave}
+                onClick={() => selectedConexion ? handleSave() : handleEventSave()}
                 className="w-full rounded-lg bg-[linear-gradient(135deg,_#f97316_0%,_#ea580c_100%)] hover:bg-[linear-gradient(135deg,_#fb923c_0%,_#f97316_100%)] disabled:opacity-50 py-2 text-xs font-semibold text-white uppercase tracking-wider shadow-[0_4px_12px_rgba(234,88,12,0.3)] transition-all active:scale-98 cursor-pointer"
               >
                 {isSaving ? 'Guardando...' : 'Guardar Cambios'}
@@ -454,14 +634,39 @@ const skyAssetId = generateAssetId(textureUrl);
             onNavigate={handleNavigationTransition}
           />
         ))}
-
         {!eventsLoading && !eventsError && events.map((event) => (
           <EventMarker
             key={event._id || event.id}
             event={event}
+            onOpenModal={(ev) => setModalEvent(ev)}
           />
         ))}
       </a-scene>
+
+      {/* Modal para ver imagen del evento */}
+      {modalEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="max-w-4xl w-full bg-slate-900 rounded-lg overflow-hidden shadow-lg flex">
+            <div className="w-2/3 bg-black flex items-center justify-center">
+              {modalEvent.urlImagen ? (
+                // Imagen centrada y con objeto-fit
+                <img src={modalEvent.urlImagen} alt="Evento" className="max-h-[80vh] object-contain" />
+              ) : (
+                <div className="p-8 text-white/60">Sin imagen</div>
+              )}
+            </div>
+            <div className="w-1/3 p-4 text-white flex flex-col gap-3">
+              <h3 className="text-sm font-semibold">Descripción</h3>
+              <div className="text-[13px] text-white/80 overflow-auto max-h-[70vh]">
+                {modalEvent.descripcion || 'Sin descripción'}
+              </div>
+              <div className="mt-auto flex gap-2">
+                <button onClick={() => setModalEvent(null)} className="ml-auto rounded bg-white/10 px-3 py-2 text-sm">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
