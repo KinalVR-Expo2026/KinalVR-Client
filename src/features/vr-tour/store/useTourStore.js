@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getSceneBySubId, updateScene } from '../../../shared/api/admin';
-import { getHighResTextureUrl, preloadImage } from '../../../shared/utils/imageUtils';
+import { getHighResTextureUrl, getLowResTextureUrl, preloadImage } from '../../../shared/utils/imageUtils';
 
 export const useTourStore = create((set, get) => ({
   activeSubId: 'entrada',
@@ -22,11 +22,18 @@ export const useTourStore = create((set, get) => ({
     
     if (scene) {
       if (scene.urlImagen) {
-        const url = getHighResTextureUrl(scene.urlImagen);
-        preloadImage(url).catch(() => {});
-        set((state) => ({
-          preloadedImages: [...new Set([...state.preloadedImages, url])]
-        }));
+        const lowResUrl = getLowResTextureUrl(scene.urlImagen);
+        const highResUrl = getHighResTextureUrl(scene.urlImagen);
+        try {
+          await preloadImage(lowResUrl);
+          preloadImage(highResUrl).catch(() => {});
+          
+          set((state) => ({
+            preloadedImages: [...new Set([...state.preloadedImages, lowResUrl, highResUrl])]
+          }));
+        } catch (error) {
+          console.error("Fallo al pre-cargar la imagen inicial:", error);
+        }
       }
       if (scene.conexiones && scene.conexiones.length > 0) {
         preloadAdjacentScenes(scene.conexiones);
@@ -60,11 +67,14 @@ export const useTourStore = create((set, get) => ({
       const sceneData = await fetchSceneData(targetId);
 
       if (sceneData && sceneData.urlImagen) {
-        const textureUrl = getHighResTextureUrl(sceneData.urlImagen);
-        preloadImage(textureUrl).catch(() => { });
+        const lowResUrl = getLowResTextureUrl(sceneData.urlImagen);
+        const highResUrl = getHighResTextureUrl(sceneData.urlImagen);
+        
+        preloadImage(lowResUrl).catch(() => { });
+        preloadImage(highResUrl).catch(() => { });
         
         set((state) => ({
-          preloadedImages: [...new Set([...state.preloadedImages, textureUrl])]
+          preloadedImages: [...new Set([...state.preloadedImages, lowResUrl, highResUrl])]
         }));
       }
     });

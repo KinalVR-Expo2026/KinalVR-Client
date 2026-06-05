@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
-import { getHighResTextureUrl } from '../../../shared/utils/imageUtils';
+import { getHighResTextureUrl, getLowResTextureUrl, isImageCached, setAsCached } from '../../../shared/utils/imageUtils';
 import { useTourStore } from '../store/useTourStore';
 import { updateEvent as apiUpdateEvent } from '../../../shared/api/admin';
 
@@ -11,24 +11,29 @@ const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
 
 const generateAssetId = (url) => {
   if (!url) return 'default-sky';
-  return `asset-${url.replace(/[^a-zA-Z0-9]/g, '').slice(-30)}`;
+  // Identificamos si la URL corresponde a la imagen desenfocada
+  const isLowRes = url.includes('e_blur');
+  const type = isLowRes ? 'low' : 'high';
+  
+  // Agregamos el prefijo 'low' o 'high' para garantizar que los IDs jamás choquen
+  return `asset-${type}-${url.replace(/[^a-zA-Z0-9]/g, '').slice(-35)}`;
 };
 
 export const SceneViewer = () => {
-  const { 
-    scene, 
-    loading, 
-    cameraYaw, 
-    isTransitioning, 
-    handleNavigationTransition, 
-    cameraRef 
+  const {
+    scene,
+    loading,
+    cameraYaw,
+    isTransitioning,
+    handleNavigationTransition,
+    cameraRef
   } = useTourNavigation();
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(null);
 
   const preloadedImages = useTourStore((state) => state.preloadedImages);
-  
+
   useEffect(() => {
     if (!scene || !API_BASE_URL) return undefined;
 
@@ -92,6 +97,51 @@ export const SceneViewer = () => {
   const [saveMessage, setSaveMessage] = useState('');
   const [saveType, setSaveType] = useState(''); // 'success' | 'error'
   const [modalEvent, setModalEvent] = useState(null);
+  const [activeSkyAssetId, setActiveSkyAssetId] = useState(null);
+
+  useEffect(() => {
+    if (!scene) return;
+    
+    let isMounted = true;
+    const lowResUrl = getLowResTextureUrl(scene.urlImagen);
+    const highResUrl = getHighResTextureUrl(scene.urlImagen);
+
+    const lowResId = generateAssetId(lowResUrl);
+    const highResId = generateAssetId(highResUrl);
+
+    // ¿La imagen ya está en memoria (ya sea porque pasamos por aquí o se precargó)?
+    if (isImageCached(highResUrl)) {
+      // ¡Esquivamos la imagen borrosa y cargamos full HD de inmediato!
+      setActiveSkyAssetId(highResId);
+      return; 
+    }
+
+    // Si no está, aplicamos la carga progresiva
+    setActiveSkyAssetId(lowResId);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = highResUrl;
+    img.onload = () => {
+      // Registramos que ya se descargó para futuras visitas
+      setAsCached(highResUrl);
+      if (isMounted) {
+        setActiveSkyAssetId(highResId);
+      }
+    };
+
+    return () => {
+      isMounted = false;
+    };
+  }, [scene]);
+
+  // Actualizamos los assets que necesita procesar A-Frame
+  const allAssetsToLoad = useMemo(() => {
+    if (!scene) return preloadedImages;
+    const lowResUrl = getLowResTextureUrl(scene.urlImagen);
+    const highResUrl = getHighResTextureUrl(scene.urlImagen);
+    return Array.from(new Set([lowResUrl, highResUrl, ...preloadedImages]));
+  }, [scene, preloadedImages]);
 
   const selectedConexion = scene?.conexiones.find(
     (c) => c.targetSubId === selectedConnectionId
@@ -388,9 +438,7 @@ export const SceneViewer = () => {
 
   const textureUrl = getHighResTextureUrl(scene.urlImagen);
   console.log("Cargando textura de fondo:", textureUrl);
-const skyAssetId = generateAssetId(textureUrl);
-
-  const allAssetsToLoad = Array.from(new Set([textureUrl, ...preloadedImages])); 
+  const skyAssetId = generateAssetId(textureUrl);
 
   const [posX, posY, posZ] = selectedConexion ? selectedConexion.position.split(' ').map(Number) : [0, 0, 0];
   const [rotX, rotY, rotZ] = selectedConexion ? selectedConexion.rotation.split(' ').map(Number) : [0, 0, 0];
@@ -431,11 +479,10 @@ const skyAssetId = generateAssetId(textureUrl);
         <button
           type="button"
           onClick={() => setAdminMode(!isAdminMode)}
-          className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-medium tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)] cursor-pointer ${
-            isAdminMode
+          className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-medium tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)] cursor-pointer ${isAdminMode
               ? 'border-orange-500/50 bg-orange-950/40 text-orange-400 font-semibold shadow-[0_0_15px_rgba(249,115,22,0.2)]'
               : 'border-white/10 bg-slate-950/45 text-[#e0e4eb] hover:border-white/30 hover:bg-white/5'
-          }`}
+            }`}
         >
           <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isAdminMode ? 'rotate-12 scale-110' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             {isAdminMode ? (
@@ -496,26 +543,26 @@ const skyAssetId = generateAssetId(textureUrl);
                     </>
                   ) : (
                     (() => {
-                      const [epx, epy, epz] = selectedEvent ? (selectedEvent.position || '0 0 0').split(' ').map(Number) : [0,0,0];
+                      const [epx, epy, epz] = selectedEvent ? (selectedEvent.position || '0 0 0').split(' ').map(Number) : [0, 0, 0];
                       return (
                         <>
                           <div className="flex items-center gap-1">
                             <span className="w-3 text-center text-[10px] font-bold text-white/40 uppercase">x</span>
-                            <button type="button" onClick={() => handleEventCoordChange('position','x', epx - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
-                            <input type="number" step={0.05} value={isNaN(epx) ? 0 : Number(epx.toFixed(3))} onChange={(e) => handleEventCoordChange('position','x', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
-                            <button type="button" onClick={() => handleEventCoordChange('position','x', epx + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
+                            <button type="button" onClick={() => handleEventCoordChange('position', 'x', epx - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
+                            <input type="number" step={0.05} value={isNaN(epx) ? 0 : Number(epx.toFixed(3))} onChange={(e) => handleEventCoordChange('position', 'x', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
+                            <button type="button" onClick={() => handleEventCoordChange('position', 'x', epx + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="w-3 text-center text-[10px] font-bold text-white/40 uppercase">y</span>
-                            <button type="button" onClick={() => handleEventCoordChange('position','y', epy - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
-                            <input type="number" step={0.05} value={isNaN(epy) ? 0 : Number(epy.toFixed(3))} onChange={(e) => handleEventCoordChange('position','y', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
-                            <button type="button" onClick={() => handleEventCoordChange('position','y', epy + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
+                            <button type="button" onClick={() => handleEventCoordChange('position', 'y', epy - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
+                            <input type="number" step={0.05} value={isNaN(epy) ? 0 : Number(epy.toFixed(3))} onChange={(e) => handleEventCoordChange('position', 'y', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
+                            <button type="button" onClick={() => handleEventCoordChange('position', 'y', epy + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="w-3 text-center text-[10px] font-bold text-white/40 uppercase">z</span>
-                            <button type="button" onClick={() => handleEventCoordChange('position','z', epz - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
-                            <input type="number" step={0.05} value={isNaN(epz) ? 0 : Number(epz.toFixed(3))} onChange={(e) => handleEventCoordChange('position','z', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
-                            <button type="button" onClick={() => handleEventCoordChange('position','z', epz + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
+                            <button type="button" onClick={() => handleEventCoordChange('position', 'z', epz - 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
+                            <input type="number" step={0.05} value={isNaN(epz) ? 0 : Number(epz.toFixed(3))} onChange={(e) => handleEventCoordChange('position', 'z', e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
+                            <button type="button" onClick={() => handleEventCoordChange('position', 'z', epz + 0.05)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
                           </div>
                         </>
                       );
@@ -568,49 +615,51 @@ const skyAssetId = generateAssetId(textureUrl);
         </div>
       )}
 
-      <a-scene 
-        embedded 
-        antialias="true" 
-        style={{ width: '100%', height: '100%' }} 
-        cursor="rayOrigin: mouse" 
+      <a-scene
+        embedded
+        antialias="true"
+        style={{ width: '100%', height: '100%' }}
+        cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
         webxr="referenceSpaceType: local"
       >
-        <a-assets></a-assets>
+        <a-assets timeout="10000">
+          {/* Cargar todos los assets precargados */}
+          {allAssetsToLoad.map((url) => (
+            <img 
+              key={generateAssetId(url)} 
+              id={generateAssetId(url)} 
+              src={url} 
+              crossOrigin="anonymous" 
+            />
+          ))}
+        </a-assets>
  
-        <a-sky src={textureUrl} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
+        {/* Usamos el ID del asset activo. Empezará borroso y se volverá nítido. */}
+        <a-sky src={activeSkyAssetId ? `#${activeSkyAssetId}` : ''} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
 
         <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
-          <a-entity 
-            camera 
+          <a-entity
+            camera
             ref={cameraRef}
-            look-controls="reverseMouseDrag: false" 
+            look-controls="reverseMouseDrag: false"
             position="0 1.6 0"
             animation__zoomin="property: camera.fov; to: 20; dur: 350; easing: linear; startEvents: zoomInStart; resumeEvents: zoomInStart"
             animation__zoomout="property: camera.fov; to: 80; dur: 500; easing: easeOutQuad; startEvents: zoomOutStart; resumeEvents: zoomOutStart"
           ></a-entity>
 
           {/* Soporte para Hand Tracking y Mandos VR (Meta Quest 3S) */}
-          <a-entity 
-            laser-controls="hand: left" 
-            raycaster="objects: .clickable; far: 50" 
-            line="color: #f97316; opacity: 0.7"
-          ></a-entity>
-          <a-entity 
-            laser-controls="hand: right" 
-            raycaster="objects: .clickable; far: 50" 
-            line="color: #f97316; opacity: 0.7"
-          ></a-entity>
-          
+          <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
+          <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
           <a-entity hand-tracking-controls="hand: left"></a-entity>
           <a-entity hand-tracking-controls="hand: right"></a-entity>
         </a-entity>
 
         {scene.conexiones.map((conexion) => (
-          <ConnectionMarker 
-            key={conexion.targetSubId} 
-            conexion={conexion} 
-            onNavigate={handleNavigationTransition} 
+          <ConnectionMarker
+            key={conexion.targetSubId}
+            conexion={conexion}
+            onNavigate={handleNavigationTransition}
           />
         ))}
         {!eventsLoading && !eventsError && events.map((event) => (
@@ -628,7 +677,6 @@ const skyAssetId = generateAssetId(textureUrl);
           <div className="max-w-4xl w-full bg-slate-900 rounded-lg overflow-hidden shadow-lg flex">
             <div className="w-2/3 bg-black flex items-center justify-center">
               {modalEvent.urlImagen ? (
-                // Imagen centrada y con objeto-fit
                 <img src={modalEvent.urlImagen} alt="Evento" className="max-h-[80vh] object-contain" />
               ) : (
                 <div className="p-8 text-white/60">Sin imagen</div>
@@ -640,37 +688,12 @@ const skyAssetId = generateAssetId(textureUrl);
                 {modalEvent.descripcion || 'Sin descripción'}
               </div>
               <div className="mt-auto flex gap-2">
-                <button onClick={() => setModalEvent(null)} className="ml-auto rounded bg-white/10 px-3 py-2 text-sm">Cerrar</button>
+                <button onClick={() => setModalEvent(null)} className="ml-auto rounded bg-white/10 px-3 py-2 text-sm hover:bg-white/20 transition-all cursor-pointer">Cerrar</button>
               </div>
             </div>
           </div>
         </div>
       )}
-      <a-scene 
-        embedded 
-        antialias="true" 
-        style={{ width: '100%', height: '100%' }} 
-        cursor="rayOrigin: mouse" 
-        raycaster="objects: .clickable"
-        webxr="referenceSpaceType: local"
-      >
-        <a-assets timeout="3000">
-          {allAssetsToLoad.map((url) => (
-            <img 
-              key={generateAssetId(url)} 
-              id={generateAssetId(url)} 
-              src={url} 
-              crossOrigin="anonymous" 
-            />
-          ))}
-        </a-assets>
- 
-        <a-sky src={`#${skyAssetId}`} rotation="0 -90 0"></a-sky>
-
-        <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
-        </a-entity>
-
-      </a-scene>
     </div>
   );
 };
