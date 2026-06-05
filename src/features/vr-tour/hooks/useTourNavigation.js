@@ -17,6 +17,7 @@ export const useTourNavigation = () => {
   const previousSubId = useRef(null);
   const cameraRef = useRef(null);
 
+  // 1. Cargar datos de la escena y pre-cargar adyacentes
   useEffect(() => {
     let isMounted = true;
     const loadScene = async () => {
@@ -47,42 +48,70 @@ export const useTourNavigation = () => {
     return () => { isMounted = false; };
   }, [activeSubId, fetchSceneData, preloadAdjacentScenes, pendingNextSubId, isTransitioning, scene]);
 
+  // 2. Callback para iniciar la transición (Dispara zoomInStart)
   const handleNavigationTransition = useCallback((targetId) => {
-    if (!cameraRef.current || isTransitioning) return;
-
+    if (!targetId || isTransitioning || !cameraRef.current) return;
+    
     setPendingNextSubId(targetId);
     setIsTransitioning(true);
-    
-    // WebXR Safe Transition (Blink transition instead of FOV/Spheres to prevent A-Frame rendering bugs)
-    setTimeout(() => {
-      const nextScene = useTourStore.getState().scenesCache[targetId.trim()];
-      if (nextScene && nextScene.conexiones) {
-        const backConnection = nextScene.conexiones.find(c => c.targetSubId?.trim() === activeSubId?.trim());
-        if (backConnection && backConnection.rotation) {
-          const yRot = parseFloat(backConnection.rotation.split(' ')[1]);
-          setCameraYaw((yRot + 180) % 360);
-        } else {
-          setCameraYaw(0);
+
+    const cameraEl = cameraRef.current;
+    if (cameraEl) {
+      cameraEl.emit('zoomInStart');
+    }
+  }, [isTransitioning]);
+
+  // 3. Effect independiente para escuchar el fin de las animaciones de A-Frame
+  useEffect(() => {
+    const cameraEl = cameraRef.current;
+    if (!cameraEl) return;
+
+    const handleAnimationComplete = (evt) => {
+      const animationName = evt.detail.name;
+
+      if (animationName === 'animation__zoomin') {
+        if (pendingNextSubId) {
+          const nextScene = useTourStore.getState().scenesCache[pendingNextSubId.trim()];
+          
+          if (nextScene && nextScene.conexiones) {
+            const backConnection = nextScene.conexiones.find(c => c.targetSubId?.trim() === activeSubId?.trim());
+            
+            if (backConnection && backConnection.rotation) {
+              const yRot = parseFloat(backConnection.rotation.split(' ')[1]);
+              setCameraYaw((yRot + 180) % 360);
+            } else {
+              setCameraYaw(0);
+            }
+          }
+
+          // Resetea los controles internos del look-controls de A-Frame de forma segura
+          const sceneEl = document.querySelector('a-scene');
+          if (sceneEl && !sceneEl.is('vr-mode') && cameraEl.components['look-controls']) {
+            cameraEl.components['look-controls'].pitchObject.rotation.x = 0;
+            cameraEl.components['look-controls'].yawObject.rotation.y = 0;
+          }
+
+          previousSubId.current = activeSubId;
+          setActiveSubId(pendingNextSubId); 
+          setPendingNextSubId(null);
+          
+          // Disparar zoom-out en el siguiente frame de renderizado
+          requestAnimationFrame(() => {
+            cameraEl.emit('zoomOutStart');
+          });
         }
       }
-
-      // Reset internal look-controls ONLY if we are not in an active WebXR session
-      const sceneEl = document.querySelector('a-scene');
-      const cameraEl = cameraRef.current;
-      if (sceneEl && !sceneEl.is('vr-mode') && cameraEl && cameraEl.components['look-controls']) {
-        cameraEl.components['look-controls'].pitchObject.rotation.x = 0;
-        cameraEl.components['look-controls'].yawObject.rotation.y = 0;
-      }
-
-      previousSubId.current = activeSubId;
-      setActiveSubId(targetId);
-      setPendingNextSubId(null);
-
-      setTimeout(() => {
+      
+      if (animationName === 'animation__zoomout') {
         setIsTransitioning(false);
-      }, 50); 
-    }, 150); 
-  }, [isTransitioning, activeSubId, setActiveSubId]);
+      }
+    };
+
+    cameraEl.addEventListener('animationcomplete', handleAnimationComplete);
+    return () => {
+      cameraEl.removeEventListener('animationcomplete', handleAnimationComplete);
+    };
+  }, [pendingNextSubId, setActiveSubId, activeSubId]);  
 
   return {
     scene,
