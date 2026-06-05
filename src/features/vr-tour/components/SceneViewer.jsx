@@ -402,17 +402,26 @@ const skyAssetId = generateAssetId(textureUrl);
         </div>
       )}
 
-      <a-scene 
-        embedded 
-        antialias="true" 
-        style={{ width: '100%', height: '100%' }} 
-        cursor="rayOrigin: mouse" 
+      <a-scene
+        embedded
+        antialias="true"
+        style={{ width: '100%', height: '100%' }}
+        cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
-        webxr="referenceSpaceType: local"
+        webxr="referenceSpaceType: local-floor"
       >
-        <a-assets></a-assets>
- 
-        <a-sky src={textureUrl} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
+        <a-assets timeout="3000">
+          {allAssetsToLoad.map((url) => (
+            <img
+              key={generateAssetId(url)}
+              id={generateAssetId(url)}
+              src={url}
+              crossOrigin="anonymous"
+            />
+          ))}
+        </a-assets>
+
+        <a-sky src={`#${skyAssetId}`} rotation="0 -90 0"></a-sky>
 
         <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
           <a-entity
@@ -423,26 +432,26 @@ const skyAssetId = generateAssetId(textureUrl);
           ></a-entity>
 
           {/* Soporte para Hand Tracking y Mandos VR (Meta Quest 3S) */}
-          <a-entity 
-            laser-controls="hand: left" 
-            raycaster="objects: .clickable; far: 50" 
+          <a-entity
+            laser-controls="hand: left"
+            raycaster="objects: .clickable; far: 50"
             line="color: #f97316; opacity: 0.7"
           ></a-entity>
-          <a-entity 
-            laser-controls="hand: right" 
-            raycaster="objects: .clickable; far: 50" 
+          <a-entity
+            laser-controls="hand: right"
+            raycaster="objects: .clickable; far: 50"
             line="color: #f97316; opacity: 0.7"
           ></a-entity>
-          
+
           <a-entity hand-tracking-controls="hand: left"></a-entity>
           <a-entity hand-tracking-controls="hand: right"></a-entity>
         </a-entity>
 
         {scene.conexiones.map((conexion) => (
-          <ConnectionMarker 
-            key={conexion.targetSubId} 
-            conexion={conexion} 
-            onNavigate={handleNavigationTransition} 
+          <ConnectionMarker
+            key={conexion.targetSubId}
+            conexion={conexion}
+            onNavigate={handleNavigationTransition}
           />
         ))}
 
@@ -452,31 +461,6 @@ const skyAssetId = generateAssetId(textureUrl);
             event={event}
           />
         ))}
-      </a-scene>
-      <a-scene 
-        embedded 
-        antialias="true" 
-        style={{ width: '100%', height: '100%' }} 
-        cursor="rayOrigin: mouse" 
-        raycaster="objects: .clickable"
-        webxr="referenceSpaceType: local"
-      >
-        <a-assets timeout="3000">
-          {allAssetsToLoad.map((url) => (
-            <img 
-              key={generateAssetId(url)} 
-              id={generateAssetId(url)} 
-              src={url} 
-              crossOrigin="anonymous" 
-            />
-          ))}
-        </a-assets>
- 
-        <a-sky src={`#${skyAssetId}`} rotation="0 -90 0"></a-sky>
-
-        <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
-        </a-entity>
-
       </a-scene>
     </div>
   );

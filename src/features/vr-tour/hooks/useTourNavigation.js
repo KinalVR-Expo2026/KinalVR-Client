@@ -66,8 +66,10 @@ export const useTourNavigation = () => {
         }
       }
 
+      // Reset internal look-controls ONLY if we are not in an active WebXR session
+      const sceneEl = document.querySelector('a-scene');
       const cameraEl = cameraRef.current;
-      if (cameraEl && cameraEl.components['look-controls']) {
+      if (sceneEl && !sceneEl.is('vr-mode') && cameraEl && cameraEl.components['look-controls']) {
         cameraEl.components['look-controls'].pitchObject.rotation.x = 0;
         cameraEl.components['look-controls'].yawObject.rotation.y = 0;
       }
