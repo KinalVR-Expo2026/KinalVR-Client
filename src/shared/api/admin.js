@@ -7,7 +7,8 @@ export const getSceneBySubId = async (subId) => {
 
 export const getSceneById = async (id) => {
   const response = await axiosAdmin.get(`/scenes/${id}`);
-}
+};
+
 export const updateScene = async (id, data) => {
   const response = await axiosAdmin.put(`/scenes/${id}`, data);
   return response.data.scene;

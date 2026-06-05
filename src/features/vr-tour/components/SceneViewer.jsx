@@ -1,5 +1,5 @@
 import 'aframe';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
@@ -8,6 +8,11 @@ import { useTourStore } from '../store/useTourStore';
 import { updateEvent as apiUpdateEvent } from '../../../shared/api/admin';
 
 const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
+
+const generateAssetId = (url) => {
+  if (!url) return 'default-sky';
+  return `asset-${url.replace(/[^a-zA-Z0-9]/g, '').slice(-30)}`;
+};
 
 export const SceneViewer = () => {
   const { 
@@ -22,6 +27,8 @@ export const SceneViewer = () => {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(null);
 
+  const preloadedImages = useTourStore((state) => state.preloadedImages);
+  
   useEffect(() => {
     if (!scene || !API_BASE_URL) return undefined;
 
@@ -381,8 +388,9 @@ export const SceneViewer = () => {
 
   const textureUrl = getHighResTextureUrl(scene.urlImagen);
   console.log("Cargando textura de fondo:", textureUrl);
-  const skyAssetId = `sky-${textureUrl.replace(/[^a-zA-Z0-9]/g, '-')}`;
- 
+const skyAssetId = generateAssetId(textureUrl);
+
+  const allAssetsToLoad = Array.from(new Set([textureUrl, ...preloadedImages])); 
 
   const [posX, posY, posZ] = selectedConexion ? selectedConexion.position.split(' ').map(Number) : [0, 0, 0];
   const [rotX, rotY, rotZ] = selectedConexion ? selectedConexion.rotation.split(' ').map(Number) : [0, 0, 0];
@@ -638,6 +646,31 @@ export const SceneViewer = () => {
           </div>
         </div>
       )}
+      <a-scene 
+        embedded 
+        antialias="true" 
+        style={{ width: '100%', height: '100%' }} 
+        cursor="rayOrigin: mouse" 
+        raycaster="objects: .clickable"
+        webxr="referenceSpaceType: local"
+      >
+        <a-assets timeout="3000">
+          {allAssetsToLoad.map((url) => (
+            <img 
+              key={generateAssetId(url)} 
+              id={generateAssetId(url)} 
+              src={url} 
+              crossOrigin="anonymous" 
+            />
+          ))}
+        </a-assets>
+ 
+        <a-sky src={`#${skyAssetId}`} rotation="0 -90 0"></a-sky>
+
+        <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
+        </a-entity>
+
+      </a-scene>
     </div>
   );
 };
