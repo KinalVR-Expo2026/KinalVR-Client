@@ -2,7 +2,13 @@ const imageCache = new Set();
 
 export const getHighResTextureUrl = (url) => {
   if (!url || !url.includes('cloudinary.com')) return url;
-  return url.replace('/upload/', '/upload/q_100,w_4096,h_2048,c_scale/');
+  return url.replace('/upload/', '/upload/q_auto,w_4096,h_2048,c_scale/');
+};
+
+// Genera una imagen de 1024px con un filtro de desenfoque. Pesa apenas ~20kb y descarga instantáneamente.
+export const getLowResTextureUrl = (url) => {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  return url.replace('/upload/', '/upload/q_auto:low,w_1024,h_512,e_blur:200,c_scale/');
 };
 
 export const preloadImage = (url) => {
@@ -27,3 +33,6 @@ export const preloadImage = (url) => {
     };
   });
 };
+
+export const isImageCached = (url) => imageCache.has(url);
+export const setAsCached = (url) => imageCache.add(url);
