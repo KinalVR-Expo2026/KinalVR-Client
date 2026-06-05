@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
+import { VRControls } from './VRControls';
 import { getHighResTextureUrl } from '../../../shared/utils/imageUtils';
 import { useTourStore } from '../store/useTourStore';
 import { updateEvent as apiUpdateEvent } from '../../../shared/api/admin';
@@ -603,29 +604,7 @@ const skyAssetId = generateAssetId(textureUrl);
 
         <a-sky src={`#${skyAssetId}`} rotation="0 -90 0"></a-sky>
 
-        <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
-          <a-entity
-            camera
-            ref={cameraRef}
-            look-controls="reverseMouseDrag: false"
-            position="0 1.6 0"
-          ></a-entity>
-
-          {/* Soporte para Hand Tracking y Mandos VR (Meta Quest 3S) */}
-          <a-entity
-            laser-controls="hand: left"
-            raycaster="objects: .clickable; far: 50"
-            line="color: #f97316; opacity: 0.7"
-          ></a-entity>
-          <a-entity
-            laser-controls="hand: right"
-            raycaster="objects: .clickable; far: 50"
-            line="color: #f97316; opacity: 0.7"
-          ></a-entity>
-
-          <a-entity hand-tracking-controls="hand: left"></a-entity>
-          <a-entity hand-tracking-controls="hand: right"></a-entity>
-        </a-entity>
+        <VRControls cameraRef={cameraRef} cameraYaw={cameraYaw} />
 
         {scene.conexiones.map((conexion) => (
           <ConnectionMarker
