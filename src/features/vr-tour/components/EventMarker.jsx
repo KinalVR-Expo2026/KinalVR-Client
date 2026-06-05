@@ -1,17 +1,42 @@
 import 'aframe';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTourStore } from '../store/useTourStore';
 
 const AREA_SELECCION_COLOR = "#f97316";
 
-export const EventMarker = ({ event, onOpenModal }) => {
+export const EventMarker = ({ event, onOpenModal, isHidden = false }) => {
   const markerRef = useRef(null);
-  
+  const imgRef = useRef(null);
+  const [imgSize, setImgSize] = useState({ width: 0.75, height: 0.75 });
+
   const isAdminMode = useTourStore((state) => state.isAdminMode);
   const selectedEventId = useTourStore((state) => state.selectedEventId);
   const setSelectedEventId = useTourStore((state) => state.setSelectedEventId);
 
   const isSelected = isAdminMode && (selectedEventId === event._id);
+
+  // Refresh all raycasters when this marker mounts so VR controllers can detect it.
+  // Events are loaded asynchronously via API, so these markers mount AFTER the initial
+  // raycaster.refreshObjects() that runs when the scene loads — without this, the VR
+  // controller raycasters don't know about EventMarker entities and clicks won't register.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const raycasters = document.querySelectorAll('[raycaster]');
+      raycasters.forEach(el => {
+        if (el.components && el.components.raycaster) {
+          el.components.raycaster.refreshObjects();
+        }
+      });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Hide/show the marker when the detail modal is open for this event
+  useEffect(() => {
+    const el = markerRef.current;
+    if (!el || !el.object3D) return;
+    el.object3D.visible = !isHidden;
+  }, [isHidden]);
 
   useEffect(() => {
     const el = markerRef.current;
@@ -29,13 +54,58 @@ export const EventMarker = ({ event, onOpenModal }) => {
     el.addEventListener('click', handleInteraction);
     el.addEventListener('mousedown', handleInteraction);
     el.addEventListener('touchstart', handleInteraction);
-    
+
     return () => {
       el.removeEventListener('click', handleInteraction);
       el.removeEventListener('mousedown', handleInteraction);
       el.removeEventListener('touchstart', handleInteraction);
     };
   }, [event, isAdminMode, setSelectedEventId, onOpenModal]);
+
+  useEffect(() => {
+    if (!event.urlImagen) return;
+
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.src = event.urlImagen;
+    const DEFAULT_WIDTH = 0.75;
+
+    const applySize = (w, h) => {
+      // update state so React re-renders attributes
+      setImgSize({ width: w, height: h });
+
+      // update parent geometry (hitbox) if markerRef is available
+      const parent = markerRef.current;
+      if (parent) {
+        parent.setAttribute('geometry', `primitive: box; width: ${w}; height: ${h}; depth: 0.05`);
+
+        // Refresh raycasters after geometry change so VR controllers
+        // can detect the new mesh (the old one was replaced).
+        setTimeout(() => {
+          document.querySelectorAll('[raycaster]').forEach(el => {
+            if (el.components && el.components.raycaster) {
+              el.components.raycaster.refreshObjects();
+            }
+          });
+        }, 50);
+      }
+    };
+
+    img.onload = () => {
+      const ratio = img.naturalHeight / img.naturalWidth || 1;
+      const h = +(DEFAULT_WIDTH * ratio).toFixed(4);
+      applySize(DEFAULT_WIDTH, h);
+    };
+
+    img.onerror = () => {
+      applySize(DEFAULT_WIDTH, DEFAULT_WIDTH);
+    };
+
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [event.urlImagen]);
 
   return (
     <a-entity
@@ -48,12 +118,12 @@ export const EventMarker = ({ event, onOpenModal }) => {
     >
       {event.urlImagen ? (
         <a-image
+          ref={imgRef}
           src={event.urlImagen}
-          width="0.75"
-          height="0.75"
+          width={imgSize.width}
+          height={imgSize.height}
           position="0 0 0"
           crossOrigin="anonymous"
-          crossorigin="anonymous"
           transparent="true"
           opacity="0.95"
         />

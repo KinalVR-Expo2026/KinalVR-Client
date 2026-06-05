@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
+import { VREventDetailPanel } from './VREventDetailPanel';
 import { VRControls } from './VRControls';
 import { getHighResTextureUrl, getLowResTextureUrl, isImageCached, setAsCached } from '../../../shared/utils/imageUtils';
 import { useTourStore } from '../store/useTourStore';
@@ -95,6 +96,8 @@ export const SceneViewer = () => {
   const [modalEvent, setModalEvent] = useState(null);
   const [activeSkyAssetId, setActiveSkyAssetId] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [enableHandTracking, setEnableHandTracking] = useState(false);
+  const [isInVR, setIsInVR] = useState(false);
 
   useEffect(() => {
     const updateFullscreenState = () => {
@@ -143,7 +146,7 @@ export const SceneViewer = () => {
 
   useEffect(() => {
     if (!scene) return;
-    
+
     let isMounted = true;
     const lowResUrl = getLowResTextureUrl(scene.urlImagen);
     const highResUrl = getHighResTextureUrl(scene.urlImagen);
@@ -153,7 +156,7 @@ export const SceneViewer = () => {
 
     if (isImageCached(highResUrl)) {
       setActiveSkyAssetId(highResId);
-      return; 
+      return;
     }
 
     setActiveSkyAssetId(lowResId);
@@ -380,7 +383,7 @@ export const SceneViewer = () => {
       const timeout = setTimeout(() => {
         const raycasters = document.querySelectorAll('[raycaster]');
         raycasters.forEach(el => {
-          if (el.components.raycaster) {
+          if (el.components && el.components.raycaster) {
             el.components.raycaster.refreshObjects();
           }
         });
@@ -388,6 +391,100 @@ export const SceneViewer = () => {
       return () => clearTimeout(timeout);
     }
   }, [scene]);
+
+  // Also refresh raycasters when events finish loading (they load asynchronously via fetch
+  // AFTER the scene, so the EventMarker entities mount after the scene-based refresh above)
+  useEffect(() => {
+    if (events.length === 0) return;
+    const timeout = setTimeout(() => {
+      const raycasters = document.querySelectorAll('[raycaster]');
+      raycasters.forEach(el => {
+        if (el.components && el.components.raycaster) {
+          el.components.raycaster.refreshObjects();
+        }
+      });
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [events]);
+
+  // Detectar automáticante si la sesión WebXR tiene hand-tracking disponible
+  useEffect(() => {
+    const sceneEl = sceneRef.current;
+    if (!sceneEl) return;
+
+    let session = null;
+    const handleInputSourcesChange = () => {
+      try {
+        session = sceneEl.renderer && sceneEl.renderer.xr && sceneEl.renderer.xr.getSession && sceneEl.renderer.xr.getSession();
+        const hasHand = session && Array.from(session.inputSources || []).some(s => !!s.hand);
+        setEnableHandTracking(Boolean(hasHand));
+      } catch (err) {
+        setEnableHandTracking(false);
+      }
+    };
+
+    const onEnter = () => {
+      // small delay to allow XR session to be available
+      setTimeout(() => {
+        try {
+          session = sceneEl.renderer && sceneEl.renderer.xr && sceneEl.renderer.xr.getSession && sceneEl.renderer.xr.getSession();
+          if (session) {
+            const hasHand = Array.from(session.inputSources || []).some(s => !!s.hand);
+            setEnableHandTracking(Boolean(hasHand));
+            session.addEventListener && session.addEventListener('inputsourceschange', handleInputSourcesChange);
+          } else {
+            setEnableHandTracking(false);
+          }
+        } catch (err) {
+          setEnableHandTracking(false);
+        }
+      }, 200);
+    };
+
+    const onExit = () => {
+      try {
+        session = sceneEl.renderer && sceneEl.renderer.xr && sceneEl.renderer.xr.getSession && sceneEl.renderer.xr.getSession();
+        if (session && session.removeEventListener) session.removeEventListener('inputsourceschange', handleInputSourcesChange);
+      } catch (err) { }
+      setEnableHandTracking(false);
+    };
+
+    sceneEl.addEventListener('enter-vr', onEnter);
+    sceneEl.addEventListener('exit-vr', onExit);
+
+    return () => {
+      sceneEl.removeEventListener('enter-vr', onEnter);
+      sceneEl.removeEventListener('exit-vr', onExit);
+      try {
+        session = sceneEl.renderer && sceneEl.renderer.xr && sceneEl.renderer.xr.getSession && sceneEl.renderer.xr.getSession();
+        if (session && session.removeEventListener) session.removeEventListener('inputsourceschange', handleInputSourcesChange);
+      } catch (err) { }
+    };
+  }, [sceneRef]);
+
+  // Detect immersive VR mode to switch between HTML modal and in-scene panel.
+  // IMPORTANT: depends on [scene] because on page reload the component first renders a
+  // loading placeholder (no <a-scene>). Only when `scene` is set does the <a-scene>
+  // render and sceneRef.current become available. Using [] would miss it.
+  useEffect(() => {
+    const sceneEl = sceneRef.current;
+    if (!sceneEl) return;
+
+    const onEnterVR = () => setIsInVR(true);
+    const onExitVR = () => setIsInVR(false);
+
+    // Check if already in VR (e.g. hot-reload)
+    if (sceneEl.is && sceneEl.is('vr-mode')) setIsInVR(true);
+
+    sceneEl.addEventListener('enter-vr', onEnterVR);
+    sceneEl.addEventListener('exit-vr', onExitVR);
+
+    return () => {
+      sceneEl.removeEventListener('enter-vr', onEnterVR);
+      sceneEl.removeEventListener('exit-vr', onExitVR);
+    };
+  }, [scene]);
+
   // Keyboard controls for selected event (edit position/rotation)
 
   useEffect(() => {
@@ -530,8 +627,8 @@ export const SceneViewer = () => {
           type="button"
           onClick={() => setAdminMode(!isAdminMode)}
           className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-medium tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)] cursor-pointer ${isAdminMode
-              ? 'border-orange-500/50 bg-orange-950/40 text-orange-400 font-semibold shadow-[0_0_15px_rgba(249,115,22,0.2)]'
-              : 'border-white/10 bg-slate-950/45 text-[#e0e4eb] hover:border-white/30 hover:bg-white/5'
+            ? 'border-orange-500/50 bg-orange-950/40 text-orange-400 font-semibold shadow-[0_0_15px_rgba(249,115,22,0.2)]'
+            : 'border-white/10 bg-slate-950/45 text-[#e0e4eb] hover:border-white/30 hover:bg-white/5'
             }`}
         >
           <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isAdminMode ? 'rotate-12 scale-110' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -545,7 +642,7 @@ export const SceneViewer = () => {
         </button>
         <button
           type="button"
-          onClick={() => { toggleFullscreen().catch(() => {}); }}
+          onClick={() => { toggleFullscreen().catch(() => { }); }}
           title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
           aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
           className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/45 text-[#e0e4eb] shadow-[0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all duration-300 cursor-pointer hover:border-white/30 hover:bg-white/5"
@@ -678,9 +775,7 @@ export const SceneViewer = () => {
         cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
 
-        xr-mode-ui="enterVREnabled: false; enterAREnabled: false"
-        webxr="referenceSpaceType: local"
-
+        xr-mode-ui="enterVREnabled: true; enterAREnabled: false"
         webxr="referenceSpaceType: local-floor"
 
       >
@@ -695,19 +790,13 @@ export const SceneViewer = () => {
           ))}
         </a-assets>
 
- 
+
         <a-sky src={activeSkyAssetId ? `#${activeSkyAssetId}` : ''} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
 
 
         <a-sky src={activeSkyAssetId ? `#${activeSkyAssetId}` : `#${skyAssetId}`} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
 
-
-          <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
-          <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
-          <a-entity hand-tracking-controls="hand: left"></a-entity>
-          <a-entity hand-tracking-controls="hand: right"></a-entity>
-
-        <VRControls cameraRef={cameraRef} cameraYaw={cameraYaw} />
+        <VRControls cameraRef={cameraRef} cameraYaw={cameraYaw} enableHandTracking={enableHandTracking} />
 
 
         {scene.conexiones.map((conexion) => (
@@ -722,11 +811,21 @@ export const SceneViewer = () => {
             key={event._id || event.id}
             event={event}
             onOpenModal={(ev) => setModalEvent(ev)}
+            isHidden={modalEvent != null && (event._id || event.id) === (modalEvent._id || modalEvent.id)}
           />
         ))}
+
+        {/* In-scene VR detail panel — only visible inside immersive mode */}
+        {isInVR && modalEvent && (
+          <VREventDetailPanel
+            event={modalEvent}
+            cameraRef={cameraRef}
+            onClose={() => setModalEvent(null)}
+          />
+        )}
       </a-scene>
 
-      {modalEvent && (
+      {!isInVR && modalEvent && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 cursor-pointer"
           onClick={() => setModalEvent(null)}
