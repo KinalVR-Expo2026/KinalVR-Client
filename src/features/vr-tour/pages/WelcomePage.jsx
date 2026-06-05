@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react';import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTourStore } from '../store/useTourStore';
 
 const NUMERALS = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
@@ -101,7 +102,7 @@ const TopBar = () => {
   );
 };
 
-const HeroContent = ({ onStart }) => {
+const HeroContent = ({ onStart, isReady }) => {
   return (
     <section className="relative z-10 flex flex-col items-center text-center animate-content-fade-in">
       <div className="mb-4 flex h-8 w-8 items-center justify-center md:mb-6 md:h-10 md:w-10">
@@ -122,16 +123,21 @@ const HeroContent = ({ onStart }) => {
       </p>
 
       <button
-        className="flex items-center gap-3 rounded-full border-0 bg-[linear-gradient(135deg,_#f97316_0%,_#ea580c_100%)] px-8 py-3.5 font-[var(--font-sans)] text-[11px] font-semibold uppercase tracking-[2px] text-white shadow-[0_8px_24px_rgba(234,88,12,0.4),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,_#fb923c_0%,_#f97316_100%)] hover:shadow-[0_12px_32px_rgba(234,88,12,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:translate-y-px active:shadow-[0_4px_12px_rgba(234,88,12,0.3)] md:px-10 md:py-4"
+        className={`flex items-center gap-3 rounded-full border-0 px-8 py-3.5 font-[var(--font-sans)] text-[11px] font-semibold uppercase tracking-[2px] text-white transition-all duration-300 md:px-10 md:py-4 ${
+          isReady 
+            ? "bg-[linear-gradient(135deg,_#f97316_0%,_#ea580c_100%)] shadow-[0_8px_24px_rgba(234,88,12,0.4),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,_#fb923c_0%,_#f97316_100%)] hover:shadow-[0_12px_32px_rgba(234,88,12,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:translate-y-px active:shadow-[0_4px_12px_rgba(234,88,12,0.3)] cursor-pointer"
+            : "bg-slate-700 opacity-50 cursor-not-allowed"
+        }`}
         type="button"
         onClick={onStart}
+        disabled={!isReady}
       >
         <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-white/60">
           <svg viewBox="0 0 12 12" className="ml-px h-1.5 w-1.5 fill-white">
             <polygon points="4,3 9,6 4,9" />
           </svg>
         </span>
-        Iniciar Experiencia
+        {isReady ? 'Iniciar Experiencia' : 'Cargando Entorno...'}
       </button>
     </section>
   );
@@ -140,9 +146,14 @@ const HeroContent = ({ onStart }) => {
 export const WelcomePage = () => {
   const navigate = useNavigate();
   const preloadInitialScene = useTourStore((state) => state.preloadInitialScene);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    preloadInitialScene('entrada');
+    const initPreload = async () => {
+      await preloadInitialScene('entrada');
+      setIsReady(true);
+    };
+    initPreload();
   }, [preloadInitialScene]);
 
   return (
@@ -154,7 +165,7 @@ export const WelcomePage = () => {
       </div>
 
       <TopBar />
-      <HeroContent onStart={() => navigate('/dashboard')} />
+      <HeroContent onStart={() => navigate('/dashboard')} isReady={isReady} />
     </div>
   );
 };
