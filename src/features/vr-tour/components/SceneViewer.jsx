@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
+import { VRControls } from './VRControls';
 import { getHighResTextureUrl, getLowResTextureUrl, isImageCached, setAsCached } from '../../../shared/utils/imageUtils';
 import { useTourStore } from '../store/useTourStore';
 import { updateEvent as apiUpdateEvent } from '../../../shared/api/admin';
@@ -374,6 +375,22 @@ export const SceneViewer = () => {
   }, [isAdminMode, selectedConnectionId, scene, updateConnectionCoords]);
 
   useEffect(() => {
+    if (scene) {
+      // Force A-Frame raycasters to refresh their objects list when new markers are mounted
+      const timeout = setTimeout(() => {
+        const raycasters = document.querySelectorAll('[raycaster]');
+        raycasters.forEach(el => {
+          if (el.components.raycaster) {
+            el.components.raycaster.refreshObjects();
+          }
+        });
+      }, 150);
+      return () => clearTimeout(timeout);
+    }
+  }, [scene]);
+  // Keyboard controls for selected event (edit position/rotation)
+
+  useEffect(() => {
     if (!isAdminMode || !selectedEvent) return;
 
     const handleKeyDown = (e) => {
@@ -660,37 +677,38 @@ export const SceneViewer = () => {
         style={{ width: '100%', height: '100%' }}
         cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
+
         xr-mode-ui="enterVREnabled: false; enterAREnabled: false"
         webxr="referenceSpaceType: local"
+
+        webxr="referenceSpaceType: local-floor"
+
       >
         <a-assets timeout="10000">
           {allAssetsToLoad.map((url) => (
-            <img 
-              key={generateAssetId(url)} 
-              id={generateAssetId(url)} 
-              src={url} 
-              crossOrigin="anonymous" 
+            <img
+              key={generateAssetId(url)}
+              id={generateAssetId(url)}
+              src={url}
+              crossOrigin="anonymous"
             />
           ))}
         </a-assets>
+
  
         <a-sky src={activeSkyAssetId ? `#${activeSkyAssetId}` : ''} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
 
-        <a-entity id="camera-wrapper" rotation={`0 ${cameraYaw} 0`}>
-          <a-entity
-            camera
-            ref={cameraRef}
-            look-controls="reverseMouseDrag: false"
-            position="0 1.6 0"
-            animation__zoomin="property: camera.fov; to: 20; dur: 350; easing: linear; startEvents: zoomInStart; resumeEvents: zoomInStart"
-            animation__zoomout="property: camera.fov; to: 80; dur: 500; easing: easeOutQuad; startEvents: zoomOutStart; resumeEvents: zoomOutStart"
-          ></a-entity>
+
+        <a-sky src={activeSkyAssetId ? `#${activeSkyAssetId}` : `#${skyAssetId}`} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
+
 
           <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
           <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 50" line="color: #f97316; opacity: 0.7"></a-entity>
           <a-entity hand-tracking-controls="hand: left"></a-entity>
           <a-entity hand-tracking-controls="hand: right"></a-entity>
-        </a-entity>
+
+        <VRControls cameraRef={cameraRef} cameraYaw={cameraYaw} />
+
 
         {scene.conexiones.map((conexion) => (
           <ConnectionMarker
