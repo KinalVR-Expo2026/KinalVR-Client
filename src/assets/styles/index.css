@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Inter:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+	--font-sans: 'Inter', sans-serif;
+	--font-display: 'Cormorant Garamond', serif;
+}
+
+html,
+body,
+#root {
+	min-height: 100%;
+}
+
+body {
+	margin: 0;
+	background: #060810;
+	color: #ffffff;
+	font-family: var(--font-sans);
+}
+
+@layer utilities {
+	.animate-clock-fade-in {
+		animation: clockFadeIn 2s ease-out 0.3s both;
+	}
+
+	.animate-content-fade-in {
+		animation: contentFadeIn 2s ease-out 0.3s both;
+	}
+
+	.animate-fade-in {
+		animation: fadeIn 2s ease-out 0.3s both;
+	}
+}
+
+@keyframes clockFadeIn {
+	from {
+		opacity: 0;
+		transform: scale(0.8);
+	}
+
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes contentFadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
