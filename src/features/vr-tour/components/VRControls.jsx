@@ -147,14 +147,11 @@ export const VRControls = ({ cameraRef, cameraYaw }) => {
 
   return (
     <a-entity id="camera-wrapper" ref={wrapperRef}>
-      {/* REEMPLAZAR POR ESTA CONFIGURACIÓN */}
       <a-entity
-        camera="fov: 80"
+        camera
         ref={cameraRef}
         look-controls="reverseMouseDrag: false"
         position="0 1.6 0"
-        animation__zoomin="property: camera.fov; to: 20; dur: 350; easing: linear; startEvents: zoomInStart"
-        animation__zoomout="property: camera.fov; to: 80; dur: 500; easing: easeOutQuad; startEvents: zoomOutStart"
       ></a-entity>
 
       {/* Mano Izquierda: Mandos Físicos y Hand Tracking combinados */}

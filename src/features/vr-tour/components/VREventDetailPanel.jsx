@@ -134,29 +134,39 @@ export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
     : 'Sin descripcion';
 
   // ─── Layout calculations ───
-  const imgY = PANEL_HEIGHT / 2 - 0.15 - imgDims.height / 2;
-  const dividerY = imgY - imgDims.height / 2 - 0.08;
-  const descY = dividerY - 0.12;
+  const imgY = PANEL_HEIGHT / 2 - 0.18 - imgDims.height / 2;
+  const dividerY = imgY - imgDims.height / 2 - 0.10;
+  const descY = dividerY - 0.14;
 
   return (
     <a-entity ref={panelRef} position={position} billboard>
 
-      {/* ── Outer glow ── */}
+      {/* ── Outer glow layer 1 (wide, soft) ── */}
       <a-plane
-        width={PANEL_WIDTH + 0.06}
-        height={PANEL_HEIGHT + 0.06}
+        width={PANEL_WIDTH + 0.14}
+        height={PANEL_HEIGHT + 0.14}
         color="#f97316"
-        opacity="0.1"
+        opacity="0.05"
         material="shader: flat; transparent: true; side: double"
-        position="0 0 -0.004"
+        position="0 0 -0.008"
       />
 
-      {/* ── Border ── */}
+      {/* ── Outer glow layer 2 (tighter) ── */}
       <a-plane
-        width={PANEL_WIDTH + 0.02}
-        height={PANEL_HEIGHT + 0.02}
+        width={PANEL_WIDTH + 0.08}
+        height={PANEL_HEIGHT + 0.08}
         color="#f97316"
-        opacity="0.35"
+        opacity="0.09"
+        material="shader: flat; transparent: true; side: double"
+        position="0 0 -0.005"
+      />
+
+      {/* ── Border (gradient-like effect via layered planes) ── */}
+      <a-plane
+        width={PANEL_WIDTH + 0.03}
+        height={PANEL_HEIGHT + 0.03}
+        color="#f97316"
+        opacity="0.40"
         material="shader: flat; transparent: true; side: double"
         position="0 0 -0.002"
       />
@@ -165,31 +175,71 @@ export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
       <a-plane
         width={PANEL_WIDTH}
         height={PANEL_HEIGHT}
-        color="#0f172a"
-        opacity="0.96"
+        color="#0c1222"
+        opacity="0.97"
         material="shader: flat; transparent: true; side: double"
       />
 
-      {/* ── Header bar ── */}
+      {/* ── Subtle inner dark overlay for depth ── */}
+      <a-plane
+        width={PANEL_WIDTH - 0.04}
+        height={PANEL_HEIGHT - 0.04}
+        color="#0f172a"
+        opacity="0.3"
+        material="shader: flat; transparent: true; side: double"
+        position="0 0 0.001"
+      />
+
+      {/* ── Header bar (gradient-like) ── */}
       <a-plane
         width={PANEL_WIDTH}
-        height="0.06"
-        color="#f97316"
-        opacity="0.7"
-        position={`0 ${PANEL_HEIGHT / 2 - 0.03} 0.003`}
+        height="0.07"
+        color="#ea580c"
+        opacity="0.75"
+        position={`0 ${PANEL_HEIGHT / 2 - 0.035} 0.003`}
         material="shader: flat; transparent: true; side: double"
+      />
+      {/* Header accent line (bottom edge) */}
+      <a-plane
+        width={PANEL_WIDTH}
+        height="0.004"
+        color="#fb923c"
+        opacity="0.5"
+        position={`0 ${PANEL_HEIGHT / 2 - 0.072} 0.004`}
+        material="shader: flat; transparent: true; side: double"
+      />
+
+      {/* ── Header title ── */}
+      <a-text
+        value="EVENTO"
+        align="center"
+        color="#fff"
+        width="1.4"
+        position={`0 ${PANEL_HEIGHT / 2 - 0.035} 0.006`}
+        side="double"
       />
 
       {/* ── Event image (centered, top portion) ── */}
       {event.urlImagen ? (
-        <a-image
-          src={event.urlImagen}
-          width={imgDims.width}
-          height={imgDims.height}
-          position={`0 ${imgY} 0.005`}
-          crossOrigin="anonymous"
-          material="shader: flat; transparent: true; side: double"
-        />
+        <>
+          {/* Image background frame */}
+          <a-plane
+            width={imgDims.width + 0.06}
+            height={imgDims.height + 0.06}
+            color="#1e293b"
+            opacity="0.5"
+            position={`0 ${imgY} 0.003`}
+            material="shader: flat; transparent: true; side: double"
+          />
+          <a-image
+            src={event.urlImagen}
+            width={imgDims.width}
+            height={imgDims.height}
+            position={`0 ${imgY} 0.005`}
+            crossOrigin="anonymous"
+            material="shader: flat; transparent: true; side: double"
+          />
+        </>
       ) : (
         <a-plane
           width="0.8"
@@ -204,21 +254,38 @@ export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
 
       {/* ── Divider ── */}
       <a-plane
-        width={PANEL_WIDTH - 0.15}
-        height="0.003"
+        width={PANEL_WIDTH - 0.12}
+        height="0.004"
         color="#f97316"
-        opacity="0.45"
+        opacity="0.50"
         position={`0 ${dividerY} 0.005`}
+        material="shader: flat; transparent: true; side: double"
+      />
+      {/* Divider side accents */}
+      <a-plane
+        width="0.04"
+        height="0.004"
+        color="#fb923c"
+        opacity="0.8"
+        position={`${-(PANEL_WIDTH - 0.12) / 2 + 0.02} ${dividerY} 0.006`}
+        material="shader: flat; transparent: true; side: double"
+      />
+      <a-plane
+        width="0.04"
+        height="0.004"
+        color="#fb923c"
+        opacity="0.8"
+        position={`${(PANEL_WIDTH - 0.12) / 2 - 0.02} ${dividerY} 0.006`}
         material="shader: flat; transparent: true; side: double"
       />
 
       {/* ── Description ── */}
       <a-entity position={`0 ${descY} 0.005`}>
         <a-text
-          value="Descripcion del evento"
+          value="Descripción"
           align="center"
           color="#fb923c"
-          width="1.6"
+          width="1.5"
           anchor="center"
           baseline="top"
           side="double"
@@ -227,35 +294,45 @@ export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
           value={description}
           align="center"
           color="#e2e8f0"
-          width="1.5"
-          wrap-count="38"
+          width="1.4"
+          wrap-count="36"
           anchor="center"
           baseline="top"
-          position="0 -0.1 0"
+          position="0 -0.12 0"
           side="double"
         />
       </a-entity>
 
-      {/* ── Close button (top-right) ── */}
+      {/* ── Close button (top-right, refined) ── */}
       <a-entity
         ref={closeBtnRef}
         className="clickable"
-        position={`${PANEL_WIDTH / 2 - 0.09} ${PANEL_HEIGHT / 2 - 0.03} 0.01`}
-        geometry="primitive: plane; width: 0.12; height: 0.06"
+        position={`${PANEL_WIDTH / 2 - 0.10} ${PANEL_HEIGHT / 2 - 0.035} 0.01`}
+        geometry="primitive: plane; width: 0.13; height: 0.055"
         material="color: #dc2626; opacity: 0; shader: flat; transparent: true; side: double"
-        animation__mouseenter="property: material.opacity; to: 0.6; startEvents: mouseenter; dur: 120"
-        animation__mouseleave="property: material.opacity; to: 0; startEvents: mouseleave; dur: 120"
+        animation__mouseenter="property: material.opacity; to: 0.7; startEvents: mouseenter; dur: 100"
+        animation__mouseleave="property: material.opacity; to: 0; startEvents: mouseleave; dur: 150"
       >
-        <a-text value="X" align="center" color="#fff" width="1.8" position="0 0 0.002" side="double" />
+        <a-text value="✕" align="center" color="#fff" width="1.6" position="0 0 0.002" side="double" />
       </a-entity>
+
+      {/* ── Bottom accent bar ── */}
+      <a-plane
+        width={PANEL_WIDTH}
+        height="0.004"
+        color="#f97316"
+        opacity="0.3"
+        position={`0 ${-PANEL_HEIGHT / 2 + 0.002} 0.003`}
+        material="shader: flat; transparent: true; side: double"
+      />
 
       {/* ── Hint ── */}
       <a-text
-        value="Apunta a la X para cerrar"
+        value="Apunta a la ✕ para cerrar"
         align="center"
-        color="#475569"
-        width="1.1"
-        position={`0 ${-PANEL_HEIGHT / 2 + 0.05} 0.005`}
+        color="#64748b"
+        width="1.0"
+        position={`0 ${-PANEL_HEIGHT / 2 + 0.04} 0.005`}
         side="double"
       />
     </a-entity>
