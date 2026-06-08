@@ -29,11 +29,10 @@ if (typeof AFRAME !== 'undefined' && !AFRAME.components['billboard']) {
 export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
   const panelRef = useRef(null);
   const closeBtnRef = useRef(null);
+  const backdropRef = useRef(null);
   const [position, setPosition] = useState('0 1.6 -2.5');
   const [imgDims, setImgDims] = useState({ width: 1.0, height: 0.75 });
 
-  const PANEL_WIDTH = 1.5;
-  const PANEL_HEIGHT = 1.8;
   const PANEL_DISTANCE = 2.5;
 
   // Position the panel in front of the camera when it mounts or event changes
@@ -96,32 +95,53 @@ export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
     return () => { img.onload = null; img.onerror = null; };
   }, [event?.urlImagen]);
 
-  // Close button click + raycaster refresh
+  // Close button + backdrop click + raycaster refresh
   useEffect(() => {
-    const el = closeBtnRef.current;
-    if (!el) return;
+    const closeBtn = closeBtnRef.current;
+    const backdrop = backdropRef.current;
 
     const handleClose = (e) => {
-      e.stopPropagation();
+      if (e && e.stopPropagation) e.stopPropagation();
       if (typeof onClose === 'function') onClose();
     };
 
-    el.addEventListener('click', handleClose);
-    el.addEventListener('mousedown', handleClose);
+    // Attach listeners to close button
+    if (closeBtn) {
+      closeBtn.addEventListener('click', handleClose);
+      closeBtn.addEventListener('mousedown', handleClose);
+    }
 
-    // Refresh raycasters so the close button is pickable by VR controllers
-    const timer = setTimeout(() => {
+    // Attach listeners to backdrop (click outside to close)
+    if (backdrop) {
+      backdrop.addEventListener('click', handleClose);
+      backdrop.addEventListener('mousedown', handleClose);
+    }
+
+    // Refresh raycasters multiple times with staggered delays
+    // so the X and backdrop are immediately pickable.
+    const refreshRaycasters = () => {
       document.querySelectorAll('[raycaster]').forEach(rc => {
         if (rc.components && rc.components.raycaster) {
           rc.components.raycaster.refreshObjects();
         }
       });
-    }, 120);
+    };
+    const t1 = setTimeout(refreshRaycasters, 100);
+    const t2 = setTimeout(refreshRaycasters, 400);
+    const t3 = setTimeout(refreshRaycasters, 800);
 
     return () => {
-      clearTimeout(timer);
-      el.removeEventListener('click', handleClose);
-      el.removeEventListener('mousedown', handleClose);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      if (closeBtn) {
+        closeBtn.removeEventListener('click', handleClose);
+        closeBtn.removeEventListener('mousedown', handleClose);
+      }
+      if (backdrop) {
+        backdrop.removeEventListener('click', handleClose);
+        backdrop.removeEventListener('mousedown', handleClose);
+      }
     };
   }, [onClose]);
 
@@ -133,89 +153,235 @@ export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
       : event.descripcion
     : 'Sin descripcion';
 
-  // ─── Layout calculations ───
-  const imgY = PANEL_HEIGHT / 2 - 0.15 - imgDims.height / 2;
-  const dividerY = imgY - imgDims.height / 2 - 0.08;
-  const descY = dividerY - 0.12;
+  // ─── Horizontal layout dimensions ───
+  const PW = 2.6;       // panel width (wide horizontal)
+  const PH = 1.4;       // panel height
+  const HEADER_H = 0.08; // header bar height
+  const BORDER = 0.02;   // border thickness
+  const LEFT_W = PW * 0.48;  // left section (image)
+  const RIGHT_W = PW * 0.52; // right section (description)
+
+  // Image area — constrained to left section
+  const imgMaxW = LEFT_W - 0.3;
+  const imgMaxH = PH - HEADER_H - 0.3;
+  let imgW = Math.min(imgDims.width, imgMaxW);
+  let imgH = imgW * (imgDims.height / imgDims.width);
+  if (imgH > imgMaxH) { imgH = imgMaxH; imgW = imgH * (imgDims.width / imgDims.height); }
+
+  // Positions
+  const imgCenterX = -PW / 2 + LEFT_W / 2;         // center of left section
+  const imgCenterY = -HEADER_H / 2 + 0.02;          // vertically centered below header
+  const descCenterX = PW / 2 - RIGHT_W / 2;         // center of right section
+  const dividerX = -PW / 2 + LEFT_W;                // vertical divider x
+  const frameW = imgW + 0.08;   // frame border around image
+  const frameH = imgH + 0.08;
 
   return (
     <a-entity ref={panelRef} position={position} billboard>
 
-      {/* ── Outer glow ── */}
+      {/* ═══════════════════════════════════════════════
+          OUTER GLOW — soft orange aura
+          ═══════════════════════════════════════════════ */}
       <a-plane
-        width={PANEL_WIDTH + 0.06}
-        height={PANEL_HEIGHT + 0.06}
+        width={PW + 0.16}
+        height={PH + 0.16}
         color="#f97316"
-        opacity="0.1"
+        opacity="0.04"
         material="shader: flat; transparent: true; side: double"
-        position="0 0 -0.004"
+        position="0 0 -0.010"
+      />
+      <a-plane
+        width={PW + 0.08}
+        height={PH + 0.08}
+        color="#f97316"
+        opacity="0.07"
+        material="shader: flat; transparent: true; side: double"
+        position="0 0 -0.006"
       />
 
-      {/* ── Border ── */}
+      {/* ═══════════════════════════════════════════════
+          ORANGE BORDER FRAME
+          ═══════════════════════════════════════════════ */}
       <a-plane
-        width={PANEL_WIDTH + 0.02}
-        height={PANEL_HEIGHT + 0.02}
+        width={PW + BORDER * 2}
+        height={PH + BORDER * 2}
+        color="#ea580c"
+        opacity="0.55"
+        material="shader: flat; transparent: true; side: double"
+        position="0 0 -0.003"
+      />
+
+      {/* ═══════════════════════════════════════════════
+          TRANSPARENT BACKGROUND — the scene shows through
+          ═══════════════════════════════════════════════ */}
+      <a-plane
+        width={PW}
+        height={PH}
+        color="#0a0f1a"
+        opacity="0.55"
+        material="shader: flat; transparent: true; side: double"
+        position="0 0 -0.001"
+      />
+
+      {/* ═══════════════════════════════════════════════
+          CORNER ACCENTS — circuit/tech style decorations
+          ═══════════════════════════════════════════════ */}
+      {/* Top-left corner */}
+      <a-plane width="0.15" height="0.004" color="#fb923c" opacity="0.7"
+        position={`${-PW/2 + 0.075} ${PH/2 - HEADER_H - 0.02} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+      <a-plane width="0.004" height="0.10" color="#fb923c" opacity="0.7"
+        position={`${-PW/2 + 0.02} ${PH/2 - HEADER_H - 0.07} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+      <a-plane width="0.025" height="0.025" color="#f97316" opacity="0.5"
+        position={`${-PW/2 + 0.02} ${PH/2 - HEADER_H - 0.02} 0.005`}
+        material="shader: flat; transparent: true; side: double" />
+
+      {/* Top-right corner */}
+      <a-plane width="0.15" height="0.004" color="#fb923c" opacity="0.7"
+        position={`${PW/2 - 0.075} ${PH/2 - HEADER_H - 0.02} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+      <a-plane width="0.004" height="0.10" color="#fb923c" opacity="0.7"
+        position={`${PW/2 - 0.02} ${PH/2 - HEADER_H - 0.07} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+      <a-plane width="0.025" height="0.025" color="#f97316" opacity="0.5"
+        position={`${PW/2 - 0.02} ${PH/2 - HEADER_H - 0.02} 0.005`}
+        material="shader: flat; transparent: true; side: double" />
+
+      {/* Bottom-left corner */}
+      <a-plane width="0.15" height="0.004" color="#fb923c" opacity="0.5"
+        position={`${-PW/2 + 0.075} ${-PH/2 + 0.02} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+      <a-plane width="0.004" height="0.10" color="#fb923c" opacity="0.5"
+        position={`${-PW/2 + 0.02} ${-PH/2 + 0.07} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+
+      {/* Bottom-right corner */}
+      <a-plane width="0.15" height="0.004" color="#fb923c" opacity="0.5"
+        position={`${PW/2 - 0.075} ${-PH/2 + 0.02} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+      <a-plane width="0.004" height="0.10" color="#fb923c" opacity="0.5"
+        position={`${PW/2 - 0.02} ${-PH/2 + 0.07} 0.004`}
+        material="shader: flat; transparent: true; side: double" />
+
+      {/* ═══════════════════════════════════════════════
+          HEADER BAR — "EVENTO"
+          ═══════════════════════════════════════════════ */}
+      <a-plane
+        width={PW}
+        height={HEADER_H}
+        color="#ea580c"
+        opacity="0.80"
+        position={`0 ${PH/2 - HEADER_H/2} 0.003`}
+        material="shader: flat; transparent: true; side: double"
+      />
+      {/* Header bottom accent line */}
+      <a-plane
+        width={PW}
+        height="0.004"
+        color="#fb923c"
+        opacity="0.6"
+        position={`0 ${PH/2 - HEADER_H} 0.004`}
+        material="shader: flat; transparent: true; side: double"
+      />
+      {/* Header title */}
+      <a-text
+        value="EVENTO"
+        align="center"
+        color="#fff"
+        width="1.6"
+        position={`0 ${PH/2 - HEADER_H/2} 0.006`}
+        side="double"
+      />
+
+      {/* ═══════════════════════════════════════════════
+          VERTICAL DIVIDER — separates image from description
+          ═══════════════════════════════════════════════ */}
+      <a-plane
+        width="0.003"
+        height={PH - HEADER_H - 0.08}
         color="#f97316"
         opacity="0.35"
-        material="shader: flat; transparent: true; side: double"
-        position="0 0 -0.002"
-      />
-
-      {/* ── Background ── */}
-      <a-plane
-        width={PANEL_WIDTH}
-        height={PANEL_HEIGHT}
-        color="#0f172a"
-        opacity="0.96"
+        position={`${dividerX} ${-HEADER_H/2 - 0.02} 0.004`}
         material="shader: flat; transparent: true; side: double"
       />
 
-      {/* ── Header bar ── */}
-      <a-plane
-        width={PANEL_WIDTH}
-        height="0.06"
-        color="#f97316"
-        opacity="0.7"
-        position={`0 ${PANEL_HEIGHT / 2 - 0.03} 0.003`}
-        material="shader: flat; transparent: true; side: double"
-      />
-
-      {/* ── Event image (centered, top portion) ── */}
+      {/* ═══════════════════════════════════════════════
+          LEFT SECTION — Image with ornate frame
+          ═══════════════════════════════════════════════ */}
       {event.urlImagen ? (
-        <a-image
-          src={event.urlImagen}
-          width={imgDims.width}
-          height={imgDims.height}
-          position={`0 ${imgY} 0.005`}
-          crossOrigin="anonymous"
-          material="shader: flat; transparent: true; side: double"
-        />
+        <>
+          {/* Outer frame glow */}
+          <a-plane
+            width={frameW + 0.04}
+            height={frameH + 0.04}
+            color="#b45309"
+            opacity="0.15"
+            position={`${imgCenterX} ${imgCenterY} 0.003`}
+            material="shader: flat; transparent: true; side: double"
+          />
+
+          {/* Frame outer edge (gold/dark) */}
+          <a-plane
+            width={frameW}
+            height={frameH}
+            color="#92400e"
+            opacity="0.8"
+            position={`${imgCenterX} ${imgCenterY} 0.004`}
+            material="shader: flat; transparent: true; side: double"
+          />
+
+          {/* Frame inner highlight (warm gold) */}
+          <a-plane
+            width={frameW - 0.02}
+            height={frameH - 0.02}
+            color="#d97706"
+            opacity="0.7"
+            position={`${imgCenterX} ${imgCenterY} 0.005`}
+            material="shader: flat; transparent: true; side: double"
+          />
+
+          {/* Frame inner dark edge */}
+          <a-plane
+            width={imgW + 0.03}
+            height={imgH + 0.03}
+            color="#78350f"
+            opacity="0.9"
+            position={`${imgCenterX} ${imgCenterY} 0.006`}
+            material="shader: flat; transparent: true; side: double"
+          />
+
+          {/* Actual image */}
+          <a-image
+            src={event.urlImagen}
+            width={imgW}
+            height={imgH}
+            position={`${imgCenterX} ${imgCenterY} 0.007`}
+            crossOrigin="anonymous"
+            material="shader: flat; transparent: true; side: double"
+          />
+        </>
       ) : (
-        <a-plane
-          width="0.8"
-          height="0.6"
-          color="#1e293b"
-          position={`0 ${imgY} 0.005`}
-          material="shader: flat; side: double"
-        >
-          <a-text value="Sin imagen" align="center" color="#64748b" width="1.5" side="double" />
-        </a-plane>
+        <a-entity position={`${imgCenterX} ${imgCenterY} 0.005`}>
+          <a-plane
+            width="0.7"
+            height="0.5"
+            color="#1e293b"
+            opacity="0.5"
+            material="shader: flat; transparent: true; side: double"
+          >
+            <a-text value="Sin imagen" align="center" color="#64748b" width="1.4" side="double" />
+          </a-plane>
+        </a-entity>
       )}
 
-      {/* ── Divider ── */}
-      <a-plane
-        width={PANEL_WIDTH - 0.15}
-        height="0.003"
-        color="#f97316"
-        opacity="0.45"
-        position={`0 ${dividerY} 0.005`}
-        material="shader: flat; transparent: true; side: double"
-      />
-
-      {/* ── Description ── */}
-      <a-entity position={`0 ${descY} 0.005`}>
+      {/* ═══════════════════════════════════════════════
+          RIGHT SECTION — Description
+          ═══════════════════════════════════════════════ */}
+      <a-entity position={`${descCenterX} ${imgCenterY + 0.18} 0.005`}>
+        {/* "Descripcion" label */}
         <a-text
-          value="Descripcion del evento"
+          value="Descripcion"
           align="center"
           color="#fb923c"
           width="1.6"
@@ -223,40 +389,76 @@ export const VREventDetailPanel = ({ event, cameraRef, onClose }) => {
           baseline="top"
           side="double"
         />
+        {/* Decorative line under label */}
+        <a-plane
+          width="0.5"
+          height="0.003"
+          color="#f97316"
+          opacity="0.4"
+          position="0 -0.08 0"
+          material="shader: flat; transparent: true; side: double"
+        />
+        {/* Description text */}
         <a-text
           value={description}
           align="center"
           color="#e2e8f0"
-          width="1.5"
-          wrap-count="38"
+          width="1.3"
+          wrap-count="28"
           anchor="center"
           baseline="top"
-          position="0 -0.1 0"
+          position="0 -0.14 0"
           side="double"
         />
       </a-entity>
 
-      {/* ── Close button (top-right) ── */}
+      {/* ═══════════════════════════════════════════════
+          CLOSE BUTTON — top-right of header
+          ═══════════════════════════════════════════════ */}
       <a-entity
         ref={closeBtnRef}
         className="clickable"
-        position={`${PANEL_WIDTH / 2 - 0.09} ${PANEL_HEIGHT / 2 - 0.03} 0.01`}
-        geometry="primitive: plane; width: 0.12; height: 0.06"
-        material="color: #dc2626; opacity: 0; shader: flat; transparent: true; side: double"
-        animation__mouseenter="property: material.opacity; to: 0.6; startEvents: mouseenter; dur: 120"
-        animation__mouseleave="property: material.opacity; to: 0; startEvents: mouseleave; dur: 120"
+        position={`${PW/2 - 0.10} ${PH/2 - HEADER_H/2} 0.01`}
+        geometry="primitive: plane; width: 0.13; height: 0.06"
+        material="color: #dc2626; opacity: 0.6; shader: flat; transparent: true; side: double"
+        animation__mouseenter="property: material.opacity; to: 0.9; startEvents: mouseenter; dur: 100"
+        animation__mouseleave="property: material.opacity; to: 0.6; startEvents: mouseleave; dur: 150"
       >
-        <a-text value="X" align="center" color="#fff" width="1.8" position="0 0 0.002" side="double" />
+        <a-text value="X" align="center" color="#fff" width="1.6" position="0 0 0.002" side="double" />
       </a-entity>
 
-      {/* ── Hint ── */}
+      {/* ═══════════════════════════════════════════════
+          BOTTOM ACCENT & HINT
+          ═══════════════════════════════════════════════ */}
+      <a-plane
+        width={PW}
+        height="0.004"
+        color="#f97316"
+        opacity="0.25"
+        position={`0 ${-PH/2 + 0.002} 0.003`}
+        material="shader: flat; transparent: true; side: double"
+      />
       <a-text
-        value="Apunta a la X para cerrar"
+        value="Apunta a la X para cerrar o cualquier lugar fuera del cuadro"
         align="center"
-        color="#475569"
-        width="1.1"
-        position={`0 ${-PANEL_HEIGHT / 2 + 0.05} 0.005`}
+        color="#64748b"
+        width="0.9"
+        position={`0 ${-PH/2 + 0.035} 0.005`}
         side="double"
+      />
+      {/* ═══════════════════════════════════════════════
+          BACKDROP — large invisible clickable plane behind panel
+          Click anywhere outside the panel content to close
+          ═══════════════════════════════════════════════ */}
+      <a-plane
+        ref={backdropRef}
+        className="clickable"
+        width="8"
+        height="6"
+        color="#000"
+        opacity="0"
+        material="shader: flat; transparent: true; side: double"
+        position="0 0 -0.02"
       />
     </a-entity>
   );
