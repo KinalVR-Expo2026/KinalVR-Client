@@ -154,27 +154,27 @@ export const VRControls = ({ cameraRef, cameraYaw }) => {
         position="0 1.6 0"
       ></a-entity>
 
-      {/* Mano Izquierda: Mandos Físicos y Hand Tracking combinados */}
-      <a-entity
-        hand-tracking-controls="hand: left"
-        laser-controls="hand: left"
-        raycaster="objects: .clickable; far: 50"
-        vr-only-line="color: #f97316; opacity: 0.7"
-        thumbstick-turning="turnAngle: 45"
-        hand-pinch-click
-        hand-joystick-turn="speed: 1.5; deadzone: 0.02"
-      ></a-entity>
+{/* Mano Izquierda */}
+<a-entity
+  hand-tracking-controls="hand: left"
+  laser-controls="hand: left"
+  raycaster="objects: .clickable; far: 50; showLine: true"
+  vr-only-line="color: #f97316; opacity: 0.7"
+  thumbstick-turning="turnAngle: 45"
+  hand-pinch-click
+  hand-joystick-turn="speed: 1.5; deadzone: 0.02"
+></a-entity>
 
-      {/* Mano Derecha: Mandos Físicos y Hand Tracking combinados */}
-      <a-entity
-        hand-tracking-controls="hand: right"
-        laser-controls="hand: right"
-        raycaster="objects: .clickable; far: 50"
-        vr-only-line="color: #f97316; opacity: 0.7"
-        thumbstick-turning="turnAngle: 45"
-        hand-pinch-click
-        hand-joystick-turn="speed: 1.5; deadzone: 0.02"
-      ></a-entity>
+{/* Mano Derecha */}
+<a-entity
+  hand-tracking-controls="hand: right"
+  laser-controls="hand: right"
+  raycaster="objects: .clickable; far: 50; showLine: true"
+  vr-only-line="color: #f97316; opacity: 0.7"
+  thumbstick-turning="turnAngle: 45"
+  hand-pinch-click
+  hand-joystick-turn="speed: 1.5; deadzone: 0.02"
+></a-entity>
     </a-entity>
   );
 };

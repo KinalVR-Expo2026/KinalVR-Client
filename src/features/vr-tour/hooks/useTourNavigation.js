@@ -56,22 +56,32 @@ export const useTourNavigation = () => {
     // WebXR Safe Transition (Blink transition instead of FOV/Spheres to prevent A-Frame rendering bugs)
     setTimeout(() => {
       const nextScene = useTourStore.getState().scenesCache[targetId.trim()];
+      let targetYaw = 0;
+ 
       if (nextScene && nextScene.conexiones) {
         const backConnection = nextScene.conexiones.find(c => c.targetSubId?.trim() === activeSubId?.trim());
         if (backConnection && backConnection.rotation) {
           const yRot = parseFloat(backConnection.rotation.split(' ')[1]);
-          setCameraYaw((yRot + 180) % 360);
-        } else {
-          setCameraYaw(0);
+          targetYaw = (yRot + 180) % 360;
         }
       }
-
+ 
       // Reset internal look-controls ONLY if we are not in an active WebXR session
       const sceneEl = document.querySelector('a-scene');
       const cameraEl = cameraRef.current;
-      if (sceneEl && !sceneEl.is('vr-mode') && cameraEl && cameraEl.components['look-controls']) {
-        cameraEl.components['look-controls'].pitchObject.rotation.x = 0;
-        cameraEl.components['look-controls'].yawObject.rotation.y = 0;
+ 
+      if (sceneEl && sceneEl.is('vr-mode') && cameraEl) {
+        // Compensación de RV: Restamos la rotación física actual de la cabeza a la rotación objetivo
+        const THREE = window.THREE || window.AFRAME.THREE;
+        const headsetYaw = THREE.MathUtils.radToDeg(cameraEl.object3D.rotation.y);
+        setCameraYaw(targetYaw - headsetYaw);
+      } else {
+        // Comportamiento normal en PC
+        if (cameraEl && cameraEl.components['look-controls']) {
+          cameraEl.components['look-controls'].pitchObject.rotation.x = 0;
+          cameraEl.components['look-controls'].yawObject.rotation.y = 0;
+        }
+        setCameraYaw(targetYaw);
       }
 
       previousSubId.current = activeSubId;
@@ -80,8 +90,8 @@ export const useTourNavigation = () => {
 
       setTimeout(() => {
         setIsTransitioning(false);
-      }, 50); 
-    }, 150); 
+      }, 50);
+    }, 150);
   }, [isTransitioning, activeSubId, setActiveSubId]);
 
   return {

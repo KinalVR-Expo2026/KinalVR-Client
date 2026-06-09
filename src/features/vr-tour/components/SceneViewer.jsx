@@ -768,6 +768,7 @@ export const SceneViewer = () => {
       )}
 
       <a-scene
+        webxr="optionalFeatures: hand-tracking, layers"
         ref={sceneRef}
         embedded
         antialias="true"
