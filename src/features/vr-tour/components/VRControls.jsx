@@ -1,10 +1,25 @@
 import { useEffect, useRef } from 'react';
-import 'aframe';
 
-// Registramos componentes personalizados de A-Frame fuera de React para evitar re-registros
-if (typeof AFRAME !== 'undefined') {
+// Aseguramos que AFRAME exista en el scope global antes de registrar
+if (typeof window !== 'undefined' && window.AFRAME) {
+  const AFRAME = window.AFRAME;
+  const THREE = window.THREE || AFRAME.THREE;
 
-  // 1. Giro con los joysticks físicos (Snap Turn para mandos VR)
+  if (!AFRAME.components['reload-on-a-button']) {
+    AFRAME.registerComponent('reload-on-a-button', {
+      init: function () {
+        this.onAButton = () => {
+          window.location.reload();
+        };
+        this.el.addEventListener('abuttondown', this.onAButton);
+      },
+      remove: function () {
+        this.el.removeEventListener('abuttondown', this.onAButton);
+      }
+    });
+  }
+
+  // 1. Giro con los joysticks físicos
   if (!AFRAME.components['thumbstick-turning']) {
     AFRAME.registerComponent('thumbstick-turning', {
       schema: {
@@ -33,7 +48,7 @@ if (typeof AFRAME !== 'undefined') {
     });
   }
 
-  // 2. Click con el gesto de pellizco (Hand Tracking)
+  // 2. Click con el gesto de pellizco
   if (!AFRAME.components['hand-pinch-click']) {
     AFRAME.registerComponent('hand-pinch-click', {
       init: function () {
@@ -49,10 +64,7 @@ if (typeof AFRAME !== 'undefined') {
     });
   }
 
-  // 3. Joystick Virtual con Seguimiento de Manos (Hand Tracking - Meta Quest Loco)
-  // Al juntar el pulgar y el índice (pinch / cerrar mano), se crea un "joystick virtual".
-  // Si mueves la mano hacia los lados sin soltar el pulgar, la cámara gira continuamente.
-  // Basado en la locomoción oficial de Meta Quest mostrada en el video.
+  // 3. Joystick Virtual con Seguimiento de Manos
   if (!AFRAME.components['hand-joystick-turn']) {
     AFRAME.registerComponent('hand-joystick-turn', {
       schema: {
@@ -97,7 +109,7 @@ if (typeof AFRAME !== 'undefined') {
     });
   }
 
-  // 4. Ocultar la línea blanca fea en PC (fuera de VR)
+  // 4. Ocultar la línea
   if (!AFRAME.components['vr-only-line']) {
     AFRAME.registerComponent('vr-only-line', {
       schema: {
@@ -140,7 +152,8 @@ export const VRControls = ({ cameraRef, cameraYaw }) => {
 
   // Sincronizar el yaw (rotación Y) sin que React sobreescriba cada frame
   useEffect(() => {
-    if (wrapperRef.current) {
+    if (wrapperRef.current && window.AFRAME) {
+      const THREE = window.THREE || window.AFRAME.THREE;
       wrapperRef.current.object3D.rotation.y = THREE.MathUtils.degToRad(cameraYaw);
     }
   }, [cameraYaw]);
@@ -154,27 +167,27 @@ export const VRControls = ({ cameraRef, cameraYaw }) => {
         position="0 1.6 0"
       ></a-entity>
 
-{/* Mano Izquierda */}
-<a-entity
-  hand-tracking-controls="hand: left"
-  laser-controls="hand: left"
-  raycaster="objects: .clickable; far: 50; showLine: true"
-  vr-only-line="color: #f97316; opacity: 0.7"
-  thumbstick-turning="turnAngle: 45"
-  hand-pinch-click
-  hand-joystick-turn="speed: 1.5; deadzone: 0.02"
-></a-entity>
+      {/* Mano Izquierda */}
+      <a-entity
+        hand-tracking-controls="hand: left"
+        laser-controls="hand: left"
+        raycaster="objects: .clickable; far: 50; showLine: true"
+        vr-only-line="color: #f97316; opacity: 0.7"
+        thumbstick-turning="turnAngle: 45"
+        hand-pinch-click
+        hand-joystick-turn="speed: 1.5; deadzone: 0.02"
+      ></a-entity>
 
-{/* Mano Derecha */}
-<a-entity
-  hand-tracking-controls="hand: right"
-  laser-controls="hand: right"
-  raycaster="objects: .clickable; far: 50; showLine: true"
-  vr-only-line="color: #f97316; opacity: 0.7"
-  thumbstick-turning="turnAngle: 45"
-  hand-pinch-click
-  hand-joystick-turn="speed: 1.5; deadzone: 0.02"
-></a-entity>
+      {/* Mano Derecha */}
+      <a-entity
+        hand-tracking-controls="hand: right"
+        laser-controls="hand: right"
+        raycaster="objects: .clickable; far: 50; showLine: true"
+        vr-only-line="color: #f97316; opacity: 0.7"
+        thumbstick-turning="turnAngle: 45"
+        hand-pinch-click
+        hand-joystick-turn="speed: 1.5; deadzone: 0.02"
+      ></a-entity>
     </a-entity>
   );
 };
