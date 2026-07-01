@@ -11,11 +11,14 @@ import { useSceneData, generateAssetId } from '../hooks/useSceneData';
 import { useXR } from '../hooks/useXR';
 import { AdminOverlay } from './AdminOverlay';
 import { EventModal } from './EventModal';
+import { MinimapWidget } from './MinimapWidget';
+import { CampusMapPage } from '../pages/CampusMapPage';
 
 export const SceneViewer = () => {
   const wrapperRef = useRef(null);
   const sceneRef = useRef(null);
   const [modalEvent, setModalEvent] = useState(null);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const { scene, loading, cameraYaw, isTransitioning, handleNavigationTransition, cameraRef } = useTourNavigation();
   const { events, eventsLoading, eventsError, activeSkyAssetId, allAssetsToLoad, updateEventCoords } = useSceneData(scene);
@@ -67,6 +70,9 @@ export const SceneViewer = () => {
         isFullscreen={isFullscreen}
         toggleFullscreen={toggleFullscreen}
       />
+
+      <MinimapWidget onOpen={() => setIsMapOpen(true)} />
+      {isMapOpen && <CampusMapPage onClose={() => setIsMapOpen(false)} />}
 
       <a-scene
         webxr="optionalFeatures: hand-tracking, layers; referenceSpaceType: local-floor"

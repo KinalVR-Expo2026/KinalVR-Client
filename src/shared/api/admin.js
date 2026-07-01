@@ -18,3 +18,8 @@ export const updateEvent = async (id, data) => {
   const response = await axiosAdmin.put(`/events/${id}`, data);
   return response.data.event;
 };
+
+export const getEvents = async (params = {}) => {
+  const response = await axiosAdmin.get('/events', { params });
+  return response.data.events;
+};
