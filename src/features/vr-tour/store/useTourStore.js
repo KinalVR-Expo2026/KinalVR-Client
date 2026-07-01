@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { getSceneBySubId, updateScene } from '../../../shared/api/admin';
 import { getHighResTextureUrl, getLowResTextureUrl, preloadImage } from '../../../shared/utils/imageUtils';
 
+const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
+
 export const useTourStore = create((set, get) => ({
   activeSubId: 'entrada',
   scenesCache: {},
@@ -47,7 +49,28 @@ export const useTourStore = create((set, get) => ({
     if (scenesCache[trimmedSubId]) return scenesCache[trimmedSubId];
 
     try {
+      // 1. Cargar datos base de la escena
       const data = await getSceneBySubId(trimmedSubId);
+
+      // 2. Cargar eventos asociados y empaquetarlos inmediatamente
+      let fetchedEvents = [];
+      if (data && (data._id || data.idEscenario)) {
+        const sceneId = data._id || data.idEscenario?._id || data.idEscenario;
+        try {
+          const response = await fetch(`${API_BASE_URL}/events/escenario/${sceneId}`);
+          if (response.ok) {
+            const eventData = await response.json();
+            fetchedEvents = Array.isArray(eventData.events) ? eventData.events :
+                            Array.isArray(eventData.eventos) ? eventData.eventos :
+                            Array.isArray(eventData) ? eventData : [];
+          }
+        } catch (err) {
+          console.error("Error al cargar eventos para la escena:", err);
+        }
+      }
+
+      data.eventos = fetchedEvents;
+
       set((state) => ({
         scenesCache: { ...state.scenesCache, [trimmedSubId]: data }
       }));
@@ -117,6 +140,8 @@ export const useTourStore = create((set, get) => ({
       const updatedScene = await updateScene(scene._id, {
         conexiones: scene.conexiones
       });
+      // Mantener los eventos cacheados al actualizar la escena
+      updatedScene.eventos = scene.eventos;
       set((state) => ({
         scenesCache: {
           ...state.scenesCache,

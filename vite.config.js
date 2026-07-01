@@ -11,6 +11,13 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: true,
+    hmr: {
+      clientPort: 443,
+      timeout: 120000
+    },
+    watch: {
+      usePolling: true
+    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'
