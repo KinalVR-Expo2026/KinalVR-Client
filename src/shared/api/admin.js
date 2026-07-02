@@ -1,5 +1,18 @@
 import { axiosAdmin } from "./api";
 
+export const getScenesList = async (params = {}) => {
+  const mergedParams = { limite: 1000, ...params };
+  const response = await axiosAdmin.get('/scenes', { params: mergedParams });
+  return response.data.scenes || response.data;
+};
+
+export const createScene = async (data) => {
+  const response = await axiosAdmin.post('/scenes', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data.scene;
+};
+
 export const getSceneBySubId = async (subId) => {
   const response = await axiosAdmin.get(`/scenes/sub/${subId}`);
   return response.data.scene; 
