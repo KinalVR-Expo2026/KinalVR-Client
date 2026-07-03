@@ -20,6 +20,7 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
   
   const [isAddingConnection, setIsAddingConnection] = useState(false);
   const [availableScenes, setAvailableScenes] = useState([]);
+  const [connectionSearchQuery, setConnectionSearchQuery] = useState('');
 
   const [isCreatingScene, setIsCreatingScene] = useState(false);
   const [newSceneData, setNewSceneData] = useState({ subId: '', ubicacion: '', nivel: 'PRIMER NIVEL', imagen: null });
@@ -410,8 +411,17 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-[400px] rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
             <h3 className="mb-4 text-lg font-semibold text-white">Añadir Nueva Conexión</h3>
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Buscar por nombre o ID..."
+                value={connectionSearchQuery}
+                onChange={(e) => setConnectionSearchQuery(e.target.value)}
+                className="w-full rounded bg-slate-800 p-2 text-sm text-white border border-white/10 focus:border-orange-500 outline-none"
+              />
+            </div>
             <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
-              {availableScenes.filter(s => s.subId !== scene?.subId).map((s) => (
+              {availableScenes.filter(s => s.subId !== scene?.subId && (s.nombre?.toLowerCase().includes(connectionSearchQuery.toLowerCase()) || s.subId.toLowerCase().includes(connectionSearchQuery.toLowerCase()))).map((s) => (
                 <button
                   key={s._id || s.id}
                   onClick={() => handleAddConnection(s.subId)}
