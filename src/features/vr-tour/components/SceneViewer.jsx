@@ -24,23 +24,16 @@ export const SceneViewer = () => {
   const { events, eventsLoading, eventsError, activeSkyAssetId, allAssetsToLoad, updateEventCoords } = useSceneData(scene);
   const { isFullscreen, toggleFullscreen, enableHandTracking, isInVR } = useXR(wrapperRef, sceneRef, scene);
 
-  // Refrescar raycasters de A-Frame cuando el escenario o los eventos cambian
+  // Refrescar raycasters de A-Frame una sola vez, tras cargar el escenario y sus
+  // eventos (antes eran dos useEffect separados con temporizadores propios que
+  // disparaban refreshObjects() por duplicado en cada carga de escena).
   useEffect(() => {
-    if (scene) {
-      const timeout = setTimeout(() => {
-        document.querySelectorAll('[raycaster]').forEach(el => el.components?.raycaster?.refreshObjects());
-      }, 150);
-      return () => clearTimeout(timeout);
-    }
-  }, [scene]);
-
-  useEffect(() => {
-    if (events.length === 0) return;
+    if (!scene) return;
     const timeout = setTimeout(() => {
       document.querySelectorAll('[raycaster]').forEach(el => el.components?.raycaster?.refreshObjects());
     }, 300);
     return () => clearTimeout(timeout);
-  }, [events]);
+  }, [scene, events]);
 
   if (loading && !isTransitioning) {
     return (

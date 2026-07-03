@@ -4,6 +4,19 @@ import { getHighResTextureUrl, getLowResTextureUrl, preloadImage } from '../../.
 
 const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
 
+// Tope de URLs de textura retenidas en preloadedImages. Cada una queda como <img>
+// dentro de <a-assets> (SceneViewer.jsx) mientras esté en esta lista, ocupando
+// memoria de GPU como textura. Sin límite, una sesión larga de kiosco acumula
+// las texturas de todas las escenas visitadas y nunca las libera.
+const MAX_PRELOADED_IMAGES = 24;
+
+const addPreloadedImages = (current, ...urls) => {
+  const merged = [...new Set([...current, ...urls])];
+  return merged.length > MAX_PRELOADED_IMAGES
+    ? merged.slice(merged.length - MAX_PRELOADED_IMAGES)
+    : merged;
+};
+
 export const useTourStore = create((set, get) => ({
   activeSubId: 'entrada',
   scenesCache: {},
@@ -29,9 +42,9 @@ export const useTourStore = create((set, get) => ({
         try {
           await preloadImage(lowResUrl);
           preloadImage(highResUrl).catch(() => {});
-          
+
           set((state) => ({
-            preloadedImages: [...new Set([...state.preloadedImages, lowResUrl, highResUrl])]
+            preloadedImages: addPreloadedImages(state.preloadedImages, lowResUrl, highResUrl)
           }));
         } catch (error) {
           console.error("Fallo al pre-cargar la imagen inicial:", error);
@@ -86,23 +99,33 @@ export const useTourStore = create((set, get) => ({
   preloadAdjacentScenes: async (conexiones) => {
     const { fetchSceneData } = get();
 
-    conexiones.forEach(async (conexion) => {
-      const targetId = conexion.targetSubId;
+    await Promise.all(
+      conexiones.map(async (conexion) => {
+        const targetId = conexion.targetSubId;
 
-      const sceneData = await fetchSceneData(targetId);
+        try {
+          const sceneData = await fetchSceneData(targetId);
 
-      if (sceneData && sceneData.urlImagen) {
-        const lowResUrl = getLowResTextureUrl(sceneData.urlImagen);
-        const highResUrl = getHighResTextureUrl(sceneData.urlImagen);
-        
-        preloadImage(lowResUrl).catch(() => { });
-        preloadImage(highResUrl).catch(() => { });
-        
-        set((state) => ({
-          preloadedImages: [...new Set([...state.preloadedImages, lowResUrl, highResUrl])]
-        }));
-      }
-    });
+          if (sceneData && sceneData.urlImagen) {
+            const lowResUrl = getLowResTextureUrl(sceneData.urlImagen);
+            const highResUrl = getHighResTextureUrl(sceneData.urlImagen);
+
+            await preloadImage(lowResUrl).catch((err) =>
+              console.warn(`No se pudo precargar la textura de baja resolución para "${targetId}":`, err)
+            );
+            preloadImage(highResUrl).catch((err) =>
+              console.warn(`No se pudo precargar la textura de alta resolución para "${targetId}":`, err)
+            );
+
+            set((state) => ({
+              preloadedImages: addPreloadedImages(state.preloadedImages, lowResUrl, highResUrl)
+            }));
+          }
+        } catch (error) {
+          console.error(`Error al precargar la escena adyacente "${targetId}":`, error);
+        }
+      })
+    );
   },
 
   updateConnectionCoords: (sceneSubId, targetSubId, { position, rotation }) => {
@@ -144,7 +167,8 @@ export const useTourStore = create((set, get) => ({
 
       const newConnection = {
         targetSubId: tId,
-        position: '0 0 -2',
+        // Debe coincidir con el default del servidor (conexionSchema en scene.model.js)
+        position: '0 1 -3',
         rotation: '0 0 0'
       };
 
@@ -177,6 +201,40 @@ export const useTourStore = create((set, get) => ({
         selectedConnectionId: state.selectedConnectionId === tId ? null : state.selectedConnectionId
       };
     });
+  },
+
+  // Guarda los metadatos editables del escenario (subId, ubicacion, urlImagen).
+  // Al cambiar subId hay que re-clavar la caché (que se indexa por subId) y, si es
+  // la escena activa, actualizar activeSubId para que siga visible.
+  saveSceneInfo: async (currentSubId, { subId, ubicacion, urlImagen }) => {
+    const curId = currentSubId ? currentSubId.trim() : currentSubId;
+    const { scenesCache } = get();
+    const scene = scenesCache[curId];
+    if (!scene || !scene._id) {
+      throw new Error("No hay datos del escenario o falta el ID del escenario");
+    }
+
+    const payload = {};
+    if (subId !== undefined) payload.subId = subId.trim();
+    if (ubicacion !== undefined) payload.ubicacion = ubicacion;
+    if (urlImagen !== undefined) payload.urlImagen = urlImagen;
+
+    const updatedScene = await updateScene(scene._id, payload);
+    // Los eventos vienen de un endpoint aparte y no los devuelve updateScene; conservarlos.
+    updatedScene.eventos = scene.eventos;
+
+    const newSubId = (updatedScene.subId || curId).trim();
+
+    set((state) => {
+      const newCache = { ...state.scenesCache };
+      delete newCache[curId];
+      newCache[newSubId] = updatedScene;
+      return {
+        scenesCache: newCache,
+        activeSubId: state.activeSubId === curId ? newSubId : state.activeSubId
+      };
+    });
+    return updatedScene;
   },
 
   saveSceneConnections: async (sceneSubId) => {
