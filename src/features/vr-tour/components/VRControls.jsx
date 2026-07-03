@@ -109,7 +109,33 @@ if (typeof window !== 'undefined' && window.AFRAME) {
     });
   }
 
-  // 4. Ocultar la línea
+  // 4. Sincronizar la flecha del minimapa con la rotación real de la cámara (sin re-render de React)
+  if (!AFRAME.components['minimap-sync']) {
+    AFRAME.registerComponent('minimap-sync', {
+      tick: function () {
+        let totalRotationY = this.el.object3D.rotation.y;
+
+        // Sumar la rotación del padre (el Rig) si existe
+        if (this.el.parentEl && this.el.parentEl.object3D) {
+          totalRotationY += this.el.parentEl.object3D.rotation.y;
+        }
+
+        // Invertimos el signo para acoplar el 3D al CSS 2D
+        let degrees = -(THREE.MathUtils.radToDeg(totalRotationY));
+
+        // Sumar el desfase de calibración de la escena (coordinacionAngulo)
+        const offset = parseFloat(this.el.getAttribute('data-offset')) || 0;
+        degrees += offset + 180; // <--- Corrección: Sumamos 180° para alinear el eje vertical
+
+        const minimapEl = document.getElementById('minimap-container');
+        if (minimapEl) {
+          minimapEl.style.setProperty('--minimap-rotation', `${degrees}deg`);
+        }
+      }
+    });
+  }
+
+  // 5. Ocultar la línea
   if (!AFRAME.components['vr-only-line']) {
     AFRAME.registerComponent('vr-only-line', {
       schema: {
@@ -147,7 +173,7 @@ if (typeof window !== 'undefined' && window.AFRAME) {
   }
 }
 
-export const VRControls = ({ cameraRef, cameraYaw }) => {
+export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
   const wrapperRef = useRef(null);
 
   // Sincronizar el yaw (rotación Y) sin que React sobreescriba cada frame
@@ -165,6 +191,8 @@ export const VRControls = ({ cameraRef, cameraYaw }) => {
         ref={cameraRef}
         look-controls="reverseMouseDrag: false"
         position="0 1.6 0"
+        minimap-sync
+        data-offset={sceneOffset}
       ></a-entity>
 
       {/* Mano Izquierda */}
