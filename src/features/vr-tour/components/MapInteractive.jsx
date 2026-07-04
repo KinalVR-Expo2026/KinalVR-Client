@@ -1,4 +1,5 @@
 import { LEVEL_PLANS, LEVEL_TO_NUM } from '../constants/campusMap';
+import { MinimapArrow } from './MinimapArrow';
 
 export const MapInteractive = ({
   activeLevel,
@@ -50,15 +51,7 @@ export const MapInteractive = ({
                 transform: `translate(-50%, -50%) rotate(${userRotation})`,
               }}
             >
-              <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible drop-shadow-md">
-                <path
-                  d="M50 15 L72 82 L50 68 L28 82 Z"
-                  fill="#20346B"
-                  stroke="white"
-                  strokeWidth="4.5"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <MinimapArrow />
             </div>
           )}
         </div>

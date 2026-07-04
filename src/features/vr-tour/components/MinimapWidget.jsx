@@ -1,18 +1,9 @@
-import nivel1Plano from '../../../assets/img/N1_Final.svg';
-import nivel2Plano from '../../../assets/img/N2_Final.svg';
-import nivel3Plano from '../../../assets/img/N3_Final.svg';
-import nivel4Plano from '../../../assets/img/N4_Final.svg';
-
-const LEVEL_PLANS = {
-  'PRIMER NIVEL': nivel1Plano,
-  'SEGUNDO NIVEL': nivel2Plano,
-  'TERCER NIVEL': nivel3Plano,
-  'CUARTO NIVEL': nivel4Plano,
-};
+import { planForScene } from '../constants/campusMap';
+import { MinimapArrow } from './MinimapArrow';
 
 export const MinimapWidget = ({ currentScene, onOpen }) => {
   const hasPosition = Boolean(currentScene?.posicion && currentScene.posicion.length > 0);
-  const planoSrc = hasPosition ? LEVEL_PLANS[currentScene.nivel] : null;
+  const planoSrc = hasPosition ? planForScene(currentScene) : null;
 
   return (
     <button
@@ -65,15 +56,7 @@ export const MinimapWidget = ({ currentScene, onOpen }) => {
           className="pointer-events-none absolute left-1/2 top-1/2 h-7 w-7"
           style={{ transform: 'translate(-50%, -50%) rotate(var(--minimap-rotation, 0deg))' }}
         >
-          <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible drop-shadow-md">
-            <path
-              d="M50 15 L72 82 L50 68 L28 82 Z"
-              fill="#20346B"
-              stroke="white"
-              strokeWidth="4.5"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <MinimapArrow />
         </div>
       )}
     </button>

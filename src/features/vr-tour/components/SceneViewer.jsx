@@ -13,12 +13,14 @@ import { AdminOverlay } from './AdminOverlay';
 import { EventModal } from './EventModal';
 import { MinimapWidget } from './MinimapWidget';
 import { CampusMapPage } from '../pages/CampusMapPage';
+import { VRCampusMap } from './VRCampusMap';
 
 export const SceneViewer = () => {
   const wrapperRef = useRef(null);
   const sceneRef = useRef(null);
   const [modalEvent, setModalEvent] = useState(null);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isVRMapOpen, setIsVRMapOpen] = useState(false);
 
   const { scene, loading, cameraYaw, isTransitioning, handleNavigationTransition, cameraRef } = useTourNavigation();
   const { events, eventsLoading, eventsError, activeSkyAssetId, allAssetsToLoad, updateEventCoords } = useSceneData(scene);
@@ -43,6 +45,13 @@ export const SceneViewer = () => {
       return () => clearTimeout(timeout);
     }
   }, [scene]);
+
+  // El minimapa 3D de muñeca (vr-minimap) emite este evento al clickearse en VR.
+  useEffect(() => {
+    const open = () => setIsVRMapOpen(true);
+    window.addEventListener('vr-minimap-open', open);
+    return () => window.removeEventListener('vr-minimap-open', open);
+  }, []);
 
   useEffect(() => {
     if (events.length === 0) return;
@@ -137,6 +146,10 @@ export const SceneViewer = () => {
 
         {isInVR && modalEvent && (
           <VREventDetailPanel event={modalEvent} cameraRef={cameraRef} onClose={() => setModalEvent(null)} />
+        )}
+
+        {isInVR && isVRMapOpen && (
+          <VRCampusMap cameraRef={cameraRef} onClose={() => setIsVRMapOpen(false)} />
         )}
       </a-scene>
 
