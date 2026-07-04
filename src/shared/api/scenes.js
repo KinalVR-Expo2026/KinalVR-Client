@@ -1,7 +1,7 @@
 import { axiosAdmin } from './api';
 
 export const getScenes = async () => {
-  const response = await axiosAdmin.get('/scenes', { params: { limite: 100 } });
+  const response = await axiosAdmin.get('/scenes', { params: { limite: 1000 } });
   return response.data.scenes;
 };
 

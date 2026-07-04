@@ -1,6 +1,12 @@
 import { LEVEL_PLANS, LEVEL_TO_NUM } from '../constants/campusMap';
 import { MinimapArrow } from './MinimapArrow';
 
+const BACKGROUND_CALIBRATION = {
+  2: { scale: 2.09, x: '-21.5%', y: '-1%' },
+  3: { scale: 2.19, x: '-20%', y: '-2.5%' },
+  4: { scale: 4.97, x: '-9%', y: '5.5%' },
+};
+
 export const MapInteractive = ({
   activeLevel,
   setActiveLevel,
@@ -13,6 +19,8 @@ export const MapInteractive = ({
   currentScene,
   userRotation,
 }) => {
+  const calc = activeLevel !== 1 ? BACKGROUND_CALIBRATION[activeLevel] : null;
+
   return (
     <>
       <div className="relative flex flex-1 min-w-0 overflow-auto p-6">
@@ -22,13 +30,30 @@ export const MapInteractive = ({
           </div>
         )}
 
-        <div className="relative m-auto transition-all duration-200 shrink-0" style={{ width: `${zoom}%` }}>
+        <div
+          className="relative m-auto transition-all duration-200 shrink-0"
+          style={{ width: `${zoom}%` }}
+          onClick={handleMapClick}
+        >
           <img
-            src={LEVEL_PLANS[activeLevel]}
-            alt={`Plano del nivel ${activeLevel}`}
-            className="w-full h-auto object-contain block"
-            onClick={handleMapClick}
+            src={LEVEL_PLANS[1]}
+            alt="Plano del nivel 1"
+            className={`relative z-0 block h-auto w-full object-contain${
+              activeLevel !== 1 ? ' opacity-40 grayscale brightness-75' : ''
+            }`}
           />
+
+          {activeLevel !== 1 && (
+            <img
+              src={LEVEL_PLANS[activeLevel]}
+              alt={`Plano del nivel ${activeLevel}`}
+              className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain"
+              style={{
+                transform: `translate(${-parseFloat(calc.x)}%, ${-parseFloat(calc.y)}%) scale(${1 / calc.scale})`,
+              }}
+            />
+          )}
+
           {isAdminTab && tempPos && (
             <div
               className="pointer-events-none absolute flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-t-4 border-t-red-700 border-red-500 bg-red-500/20 shadow-sm"
@@ -44,7 +69,7 @@ export const MapInteractive = ({
 
           {isMapTab && currentScene?.posicion && activeLevel === LEVEL_TO_NUM[currentScene.nivel] && (
             <div
-              className="pointer-events-none absolute left-1/2 top-1/2 h-8 w-8"
+              className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-8 w-8"
               style={{
                 left: `${currentScene.posicion[0]}%`,
                 top: `${currentScene.posicion[1]}%`,

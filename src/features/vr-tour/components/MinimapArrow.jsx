@@ -6,7 +6,7 @@ export const MinimapArrow = ({ className = 'h-full w-full overflow-visible drop-
   <svg viewBox="0 0 100 100" className={className}>
     <path
       d="M50 15 L72 82 L50 68 L28 82 Z"
-      fill="#20346B"
+      fill="#20336B"
       stroke="white"
       strokeWidth="4.5"
       strokeLinejoin="round"
