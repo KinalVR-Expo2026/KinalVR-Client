@@ -204,5 +204,55 @@ export const useTourStore = create((set, get) => ({
       console.error("Error al guardar conexiones en la base de datos:", error);
       throw error;
     }
+  },
+
+  addEventToSceneCache: (sceneSubId, event) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+      const updatedEvents = [...(scene.eventos || []), event];
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, eventos: updatedEvents }
+        }
+      };
+    });
+  },
+
+  removeEventFromSceneCache: (sceneSubId, eventId) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+      const updatedEvents = (scene.eventos || []).filter(e => (e._id || e.id) !== eventId);
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, eventos: updatedEvents }
+        }
+      };
+    });
+  },
+
+  updateEventInSceneCache: (sceneSubId, eventId, updatedFields) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return {};
+      const updatedEventos = (scene.eventos || []).map((e) => {
+        if ((e._id || e.id) === eventId) {
+          return { ...e, ...updatedFields };
+        }
+        return e;
+      });
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, eventos: updatedEventos }
+        }
+      };
+    });
   }
 }));
