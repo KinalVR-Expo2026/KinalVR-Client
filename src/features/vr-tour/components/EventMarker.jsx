@@ -13,7 +13,7 @@ export const EventMarker = ({ event, onOpenModal, isHidden = false }) => {
   const selectedEventId = useTourStore((state) => state.selectedEventId);
   const setSelectedEventId = useTourStore((state) => state.setSelectedEventId);
 
-  const isSelected = isAdminMode && (selectedEventId === event._id);
+  const isSelected = isAdminMode && (selectedEventId === (event._id || event.id));
 
   // Refresh all raycasters when this marker mounts so VR controllers can detect it.
   // Events are loaded asynchronously via API, so these markers mount AFTER the initial
@@ -45,7 +45,7 @@ export const EventMarker = ({ event, onOpenModal, isHidden = false }) => {
     const handleInteraction = (e) => {
       e.stopPropagation();
       if (isAdminMode) {
-        setSelectedEventId(event._id);
+        setSelectedEventId(event._id || event.id);
       } else if (typeof onOpenModal === 'function') {
         onOpenModal(event);
       }

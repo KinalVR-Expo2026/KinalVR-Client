@@ -36,3 +36,15 @@ export const getEvents = async (params = {}) => {
   const response = await axiosAdmin.get('/events', { params });
   return response.data.events;
 };
+
+export const createEvent = async (data) => {
+  const response = await axiosAdmin.post('/events', data, {
+    headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined
+  });
+  return response.data.event;
+};
+
+export const deleteEvent = async (id) => {
+  const response = await axiosAdmin.delete(`/events/${id}`);
+  return response.data;
+};
