@@ -17,11 +17,26 @@ export const useTourNavigation = () => {
   const previousSubId = useRef(null);
   const cameraRef = useRef(null);
 
+  // Espejos por ref de valores que el efecto de carga necesita leer pero que NO
+  // deben disparar una recarga de escena por sí solos (p.ej. `scene` cambia de
+  // referencia cada vez que se edita una conexión en modo admin, lo que antes
+  // volvía a ejecutar fetchSceneData/preloadAdjacentScenes en cada tecla).
+  // Se sincronizan en un efecto aparte (no durante el render) para no violar
+  // las reglas de refs de React.
+  const sceneRef = useRef(scene);
+  const isTransitioningRef = useRef(isTransitioning);
+  const pendingNextSubIdRef = useRef(pendingNextSubId);
+  useEffect(() => {
+    sceneRef.current = scene;
+    isTransitioningRef.current = isTransitioning;
+    pendingNextSubIdRef.current = pendingNextSubId;
+  }, [scene, isTransitioning, pendingNextSubId]);
+
   useEffect(() => {
     let isMounted = true;
     const loadScene = async () => {
-      if (activeSubId === pendingNextSubId) return;
-      if (!scene && !isTransitioning) setLoading(true);
+      if (activeSubId === pendingNextSubIdRef.current) return;
+      if (!sceneRef.current && !isTransitioningRef.current) setLoading(true);
 
       try {
         const data = await fetchSceneData(activeSubId);
@@ -45,7 +60,9 @@ export const useTourNavigation = () => {
     loadScene();
 
     return () => { isMounted = false; };
-  }, [activeSubId, fetchSceneData, preloadAdjacentScenes, pendingNextSubId, isTransitioning, scene]);
+    // activeSubId es la única dependencia real de navegación; fetchSceneData y
+    // preloadAdjacentScenes son acciones estables de Zustand (no cambian de referencia).
+  }, [activeSubId, fetchSceneData, preloadAdjacentScenes]);
 
   const handleNavigationTransition = useCallback((targetId) => {
     if (!cameraRef.current || isTransitioning) return;

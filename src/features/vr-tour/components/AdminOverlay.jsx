@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTourStore } from '../store/useTourStore';
-import { updateEvent as apiUpdateEvent } from '../../../shared/api/admin';
+import { updateEvent as apiUpdateEvent, getScenesList, createScene } from '../../../shared/api/admin';
+import { parseCoordString, clampCoord, POSITION_BOUND, ROTATION_BOUND } from '../../../shared/utils/coordinateUtils';
+import { SceneInfoModal } from './SceneInfoModal';
 
 export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, toggleFullscreen }) => {
   const isAdminMode = useTourStore((state) => state.isAdminMode);
@@ -11,16 +13,87 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
   const setSelectedEventId = useTourStore((state) => state.setSelectedEventId);
   const updateConnectionCoords = useTourStore((state) => state.updateConnectionCoords);
   const saveSceneConnections = useTourStore((state) => state.saveSceneConnections);
+  const addConnection = useTourStore((state) => state.addConnection);
+  const removeConnection = useTourStore((state) => state.removeConnection);
+  const saveSceneInfo = useTourStore((state) => state.saveSceneInfo);
+
+  const [isEditingScene, setIsEditingScene] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveType, setSaveType] = useState('');
+  
+  const [isAddingConnection, setIsAddingConnection] = useState(false);
+  const [availableScenes, setAvailableScenes] = useState([]);
+  const [connectionSearchQuery, setConnectionSearchQuery] = useState('');
+
+  const [isCreatingScene, setIsCreatingScene] = useState(false);
+  const [newSceneData, setNewSceneData] = useState({ subId: '', ubicacion: '', nivel: 'PRIMER NIVEL', imagen: null });
+  const [isSubmittingScene, setIsSubmittingScene] = useState(false);
+  const [sceneSubmitError, setSceneSubmitError] = useState('');
+
+  const handleCreateSceneSubmit = async (e) => {
+    e.preventDefault();
+    if (!newSceneData.subId || !newSceneData.ubicacion || !newSceneData.nivel || !newSceneData.imagen) {
+      setSceneSubmitError('Todos los campos son requeridos');
+      return;
+    }
+    setIsSubmittingScene(true);
+    setSceneSubmitError('');
+    try {
+      const formData = new FormData();
+      formData.append('subId', newSceneData.subId);
+      formData.append('ubicacion', newSceneData.ubicacion);
+      formData.append('nivel', newSceneData.nivel);
+      formData.append('imagen', newSceneData.imagen);
+      
+      const newScene = await createScene(formData);
+      setIsCreatingScene(false);
+      setNewSceneData({ subId: '', ubicacion: '', nivel: 'PRIMER NIVEL', imagen: null });
+      // Añadir el escenario recién creado a la caché local en vez de re-consultar
+      // el listado completo; evita que quede desactualizada si el modal de
+      // conexión no está abierto en este momento.
+      setAvailableScenes((prev) => [...prev, newScene]);
+      alert(`Escenario ${newScene.subId} creado exitosamente!`);
+    } catch (err) {
+      setSceneSubmitError(err.response?.data?.message || 'Error al crear el escenario');
+    } finally {
+      setIsSubmittingScene(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAddingConnection && availableScenes.length === 0) {
+      getScenesList().then(data => setAvailableScenes(data)).catch(console.error);
+    }
+  }, [isAddingConnection, availableScenes.length]);
+
+  const handleAddConnection = (targetSubId) => {
+    if (scene) {
+      addConnection(scene.subId, targetSubId);
+      setIsAddingConnection(false);
+    }
+  };
+
+  const handleDeleteConnection = async () => {
+    if (!scene || !selectedConexion) return;
+    if (!window.confirm(`¿Estás seguro de que deseas borrar la conexión hacia ${selectedConexion.targetSubId}?`)) return;
+    
+    removeConnection(scene.subId, selectedConexion.targetSubId);
+    
+    try {
+      await saveSceneConnections(scene.subId);
+    } catch (err) {
+      console.error(err);
+      alert('Error al borrar la conexión en la base de datos');
+    }
+  };
 
   const selectedConexion = scene?.conexiones.find((c) => c.targetSubId === selectedConnectionId);
   const selectedEvent = events.find(ev => (ev._id || ev.id) === selectedEventId);
 
-  const [posX, posY, posZ] = selectedConexion ? selectedConexion.position.split(' ').map(Number) : [0, 0, 0];
-  const [rotX, rotY, rotZ] = selectedConexion ? selectedConexion.rotation.split(' ').map(Number) : [0, 0, 0];
+  const [posX, posY, posZ] = selectedConexion ? parseCoordString(selectedConexion.position) : [0, 0, 0];
+  const [rotX, rotY, rotZ] = selectedConexion ? parseCoordString(selectedConexion.rotation) : [0, 0, 0];
 
   const handleCoordChange = (type, axis, value) => {
     if (!selectedConexion || !scene) return;
@@ -28,15 +101,17 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
     let newRot = [...[rotX, rotY, rotZ]];
     const val = parseFloat(value);
     if (isNaN(val)) return;
+    const bound = type === 'position' ? POSITION_BOUND : ROTATION_BOUND;
+    const clamped = clampCoord(val, bound);
 
     if (type === 'position') {
-      if (axis === 'x') newPos[0] = val;
-      if (axis === 'y') newPos[1] = val;
-      if (axis === 'z') newPos[2] = val;
+      if (axis === 'x') newPos[0] = clamped;
+      if (axis === 'y') newPos[1] = clamped;
+      if (axis === 'z') newPos[2] = clamped;
     } else {
-      if (axis === 'x') newRot[0] = val;
-      if (axis === 'y') newRot[1] = val;
-      if (axis === 'z') newRot[2] = val;
+      if (axis === 'x') newRot[0] = clamped;
+      if (axis === 'y') newRot[1] = clamped;
+      if (axis === 'z') newRot[2] = clamped;
     }
 
     updateConnectionCoords(scene.subId, selectedConnectionId, {
@@ -117,8 +192,8 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
       const currentConn = scene.conexiones.find(c => c.targetSubId === selectedConnectionId);
       if (!currentConn) return;
 
-      let [x, y, z] = currentConn.position.split(' ').map(Number);
-      let [rx, ry, rz] = currentConn.rotation.split(' ').map(Number);
+      let [x, y, z] = parseCoordString(currentConn.position);
+      let [rx, ry, rz] = parseCoordString(currentConn.rotation);
       let changed = false;
 
       if (e.shiftKey) {
@@ -139,6 +214,9 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
 
       if (changed) {
         e.preventDefault();
+        x = clampCoord(x, POSITION_BOUND);
+        y = clampCoord(y, POSITION_BOUND);
+        z = clampCoord(z, POSITION_BOUND);
         updateConnectionCoords(scene.subId, selectedConnectionId, {
           position: `${x.toFixed(3)} ${y.toFixed(3)} ${z.toFixed(3)}`,
           rotation: `${rx} ${ry} ${rz}`
@@ -188,11 +266,12 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
 
   const renderCoordinateInput = (type, axis, val, step, isEvent = false) => {
     const handler = isEvent ? handleEventCoordChange : handleCoordChange;
+    const bound = type === 'position' ? POSITION_BOUND : ROTATION_BOUND;
     return (
       <div className="flex items-center gap-1">
         <span className="w-3 text-center text-[10px] font-bold text-white/40 uppercase">{axis}</span>
         <button type="button" onClick={() => handler(type, axis, val - step)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">-</button>
-        <input type="number" step={step} value={isNaN(val) ? 0 : Number(val.toFixed(3))} onChange={(e) => handler(type, axis, e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
+        <input type="number" step={step} min={-bound} max={bound} value={isNaN(val) ? 0 : Number(val.toFixed(3))} onChange={(e) => handler(type, axis, e.target.value)} className="w-14 rounded border border-white/10 bg-slate-900/60 py-0.5 text-center text-[11px] font-semibold text-white focus:border-orange-500 focus:outline-none" />
         <button type="button" onClick={() => handler(type, axis, val + step)} className="flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/5 text-[10px] text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer">+</button>
       </div>
     );
@@ -201,6 +280,28 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
   return (
     <>
       <div className="absolute top-6 right-6 z-40 flex flex-col items-end gap-2">
+        {isAdminMode && (
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setIsCreatingScene(true)} className="flex items-center gap-2 rounded-full border border-blue-500/50 bg-blue-950/40 px-4 py-2 text-[10px] font-semibold text-blue-400 tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(59,130,246,0.3)] hover:bg-blue-900/60 cursor-pointer">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Crear Escenario
+            </button>
+            <button type="button" onClick={() => setIsAddingConnection(true)} className="flex items-center gap-2 rounded-full border border-green-500/50 bg-green-950/40 px-4 py-2 text-[10px] font-semibold text-green-400 tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(34,197,94,0.3)] hover:bg-green-900/60 cursor-pointer">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Añadir Conexión
+            </button>
+            <button type="button" onClick={() => setIsEditingScene(true)} disabled={!scene} className="flex items-center gap-2 rounded-full border border-orange-500/50 bg-orange-950/40 px-4 py-2 text-[10px] font-semibold text-orange-400 tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(249,115,22,0.3)] hover:bg-orange-900/60 disabled:opacity-40 cursor-pointer">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              </svg>
+              Editar Escenario
+            </button>
+          </div>
+        )}
         <button type="button" onClick={() => setAdminMode(!isAdminMode)} className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-medium tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)] cursor-pointer ${isAdminMode ? 'border-orange-500/50 bg-orange-950/40 text-orange-400 font-semibold shadow-[0_0_15px_rgba(249,115,22,0.2)]' : 'border-white/10 bg-slate-950/45 text-[#e0e4eb] hover:border-white/30 hover:bg-white/5'}`}>
           <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isAdminMode ? 'rotate-12 scale-110' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             {isAdminMode ? <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5V12a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 12v8.25a1.5 1.5 0 001.5 1.5z" /> : <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />}
@@ -311,11 +412,115 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
                   {saveMessage}
                 </span>
               )}
+              {selectedConexion && (
+                <button type="button" onClick={handleDeleteConnection} className="w-full rounded-lg bg-red-950/60 border border-red-500/50 hover:bg-red-900 hover:border-red-500 py-1.5 text-[10px] font-semibold text-red-400 hover:text-white uppercase tracking-wider transition-all cursor-pointer">
+                  Borrar Conexión
+                </button>
+              )}
               <button type="button" disabled={isSaving} onClick={() => selectedConexion ? handleSave() : handleEventSave()} className="w-full rounded-lg bg-[linear-gradient(135deg,_#f97316_0%,_#ea580c_100%)] hover:bg-[linear-gradient(135deg,_#fb923c_0%,_#f97316_100%)] disabled:opacity-50 py-2 text-xs font-semibold text-white uppercase tracking-wider shadow-[0_4px_12px_rgba(234,88,12,0.3)] transition-all active:scale-98 cursor-pointer">
                 {isSaving ? 'Guardando...' : 'Guardar Cambios'}
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {isAddingConnection && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-[400px] rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="mb-4 text-lg font-semibold text-white">Añadir Nueva Conexión</h3>
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Buscar por nombre o ID..."
+                value={connectionSearchQuery}
+                onChange={(e) => setConnectionSearchQuery(e.target.value)}
+                className="w-full rounded bg-slate-800 p-2 text-sm text-white border border-white/10 focus:border-orange-500 outline-none"
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
+              {availableScenes.filter(s => s.subId !== scene?.subId && (s.nombre?.toLowerCase().includes(connectionSearchQuery.toLowerCase()) || s.subId.toLowerCase().includes(connectionSearchQuery.toLowerCase()))).map((s) => (
+                <button
+                  key={s._id || s.id}
+                  onClick={() => handleAddConnection(s.subId)}
+                  className="flex flex-col rounded-lg border border-white/10 bg-slate-800 p-3 text-left transition-all hover:border-orange-500 hover:bg-slate-700 cursor-pointer"
+                >
+                  <span className="text-sm font-bold text-white">{s.nombre || s.subId}</span>
+                  <span className="text-[10px] text-white/50 font-mono">{s.subId}</span>
+                </button>
+              ))}
+              {availableScenes.length === 0 && (
+                <p className="text-center text-sm text-white/50 py-4">Cargando escenarios...</p>
+              )}
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setIsAddingConnection(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEditingScene && scene && (
+        <SceneInfoModal
+          scene={scene}
+          onSave={saveSceneInfo}
+          onClose={() => setIsEditingScene(false)}
+        />
+      )}
+
+      {isCreatingScene && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <form onSubmit={handleCreateSceneSubmit} className="w-[450px] rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl flex flex-col gap-4">
+            <h3 className="text-lg font-semibold text-white">Crear Nuevo Escenario</h3>
+            
+            {sceneSubmitError && <div className="text-xs text-red-400 bg-red-950/40 p-2 rounded">{sceneSubmitError}</div>}
+            
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold uppercase text-white/70">Sub ID (Identificador único)</label>
+              <input type="text" required value={newSceneData.subId} onChange={e => setNewSceneData({...newSceneData, subId: e.target.value})} className="rounded bg-slate-800 p-2 text-sm text-white border border-white/10 focus:border-blue-500 outline-none" placeholder="ej. patio-principal" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold uppercase text-white/70">Ubicación (Nombre amigable)</label>
+              <input type="text" required value={newSceneData.ubicacion} onChange={e => setNewSceneData({...newSceneData, ubicacion: e.target.value})} className="rounded bg-slate-800 p-2 text-sm text-white border border-white/10 focus:border-blue-500 outline-none" placeholder="ej. Patio Central" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold uppercase text-white/70">Nivel</label>
+              <select value={newSceneData.nivel} onChange={e => setNewSceneData({...newSceneData, nivel: e.target.value})} className="rounded bg-slate-800 p-2 text-sm text-white border border-white/10 focus:border-blue-500 outline-none">
+                <option value="PRIMER NIVEL">PRIMER NIVEL</option>
+                <option value="SEGUNDO NIVEL">SEGUNDO NIVEL</option>
+                <option value="TERCER NIVEL">TERCER NIVEL</option>
+                <option value="CUARTO NIVEL">CUARTO NIVEL</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold uppercase text-white/70">Imagen 360 (Archivo)</label>
+              <input type="file" required accept="image/*" onChange={e => setNewSceneData({...newSceneData, imagen: e.target.files[0]})} className="text-sm text-white/70 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600" />
+            </div>
+
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsCreatingScene(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingScene}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+              >
+                {isSubmittingScene ? 'Creando...' : 'Crear Escenario'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </>
