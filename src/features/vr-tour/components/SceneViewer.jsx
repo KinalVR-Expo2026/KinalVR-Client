@@ -28,9 +28,34 @@ export const SceneViewer = () => {
   // eventos (antes eran dos useEffect separados con temporizadores propios que
   // disparaban refreshObjects() por duplicado en cada carga de escena).
   useEffect(() => {
-    if (!scene) return;
+    if (scene) {
+      const timeout = setTimeout(() => {
+        document.querySelectorAll('[raycaster]').forEach(el => {
+          try {
+            if (el.components?.raycaster?.refreshObjects) {
+              el.components.raycaster.refreshObjects();
+            }
+          } catch (e) {
+            console.warn("A-Frame raycaster refresh warning:", e);
+          }
+        });
+      }, 150);
+      return () => clearTimeout(timeout);
+    }
+  }, [scene]);
+
+  useEffect(() => {
+    if (events.length === 0) return;
     const timeout = setTimeout(() => {
-      document.querySelectorAll('[raycaster]').forEach(el => el.components?.raycaster?.refreshObjects());
+      document.querySelectorAll('[raycaster]').forEach(el => {
+        try {
+          if (el.components?.raycaster?.refreshObjects) {
+            el.components.raycaster.refreshObjects();
+          }
+        } catch (e) {
+          console.warn("A-Frame raycaster refresh warning:", e);
+        }
+      });
     }, 300);
     return () => clearTimeout(timeout);
   }, [scene, events]);
@@ -87,17 +112,17 @@ export const SceneViewer = () => {
 
         <VRControls cameraRef={cameraRef} cameraYaw={cameraYaw} enableHandTracking={enableHandTracking} />
 
-        {scene.conexiones.map((conexion) => (
+        {scene.conexiones.map((conexion, index) => (
           <ConnectionMarker
-            key={conexion.targetSubId}
+            key={`${scene.subId}-conn-${conexion.targetSubId}-${index}`}
             conexion={conexion}
             onNavigate={handleNavigationTransition}
           />
         ))}
 
-        {!eventsLoading && !eventsError && events.map((event) => (
+        {!eventsLoading && !eventsError && events.map((event, index) => (
           <EventMarker
-            key={event._id || event.id}
+            key={`${scene.subId}-evt-${event._id || event.id}-${index}`}
             event={event}
             onOpenModal={(ev) => setModalEvent(ev)}
             isHidden={modalEvent != null && (event._id || event.id) === (modalEvent._id || modalEvent.id)}
