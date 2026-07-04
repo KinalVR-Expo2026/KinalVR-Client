@@ -69,7 +69,9 @@ export const useTourStore = create((set, get) => ({
         }
       }
 
-      data.eventos = fetchedEvents;
+      if (data) {
+        data.eventos = fetchedEvents;
+      }
 
       set((state) => ({
         scenesCache: { ...state.scenesCache, [trimmedSubId]: data }
@@ -124,6 +126,55 @@ export const useTourStore = create((set, get) => ({
           ...state.scenesCache,
           [sId]: { ...scene, conexiones: updatedConexiones }
         }
+      };
+    });
+  },
+
+  addConnection: (sceneSubId, targetSubId) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    const tId = targetSubId ? targetSubId.trim() : targetSubId;
+
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+      
+      if (scene.conexiones && scene.conexiones.some(c => c.targetSubId === tId)) {
+        return { selectedConnectionId: tId, selectedEventId: null };
+      }
+
+      const newConnection = {
+        targetSubId: tId,
+        position: '0 0 -2',
+        rotation: '0 0 0'
+      };
+
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, conexiones: [...(scene.conexiones || []), newConnection] }
+        },
+        selectedConnectionId: tId,
+        selectedEventId: null
+      };
+    });
+  },
+
+  removeConnection: (sceneSubId, targetSubId) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    const tId = targetSubId ? targetSubId.trim() : targetSubId;
+
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+
+      const filteredConexiones = (scene.conexiones || []).filter(c => c.targetSubId !== tId);
+
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, conexiones: filteredConexiones }
+        },
+        selectedConnectionId: state.selectedConnectionId === tId ? null : state.selectedConnectionId
       };
     });
   },

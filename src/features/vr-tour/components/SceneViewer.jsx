@@ -11,11 +11,14 @@ import { useSceneData, generateAssetId } from '../hooks/useSceneData';
 import { useXR } from '../hooks/useXR';
 import { AdminOverlay } from './AdminOverlay';
 import { EventModal } from './EventModal';
+import { MinimapWidget } from './MinimapWidget';
+import { CampusMapPage } from '../pages/CampusMapPage';
 
 export const SceneViewer = () => {
   const wrapperRef = useRef(null);
   const sceneRef = useRef(null);
   const [modalEvent, setModalEvent] = useState(null);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const { scene, loading, cameraYaw, isTransitioning, handleNavigationTransition, cameraRef } = useTourNavigation();
   const { events, eventsLoading, eventsError, activeSkyAssetId, allAssetsToLoad, updateEventCoords } = useSceneData(scene);
@@ -25,7 +28,15 @@ export const SceneViewer = () => {
   useEffect(() => {
     if (scene) {
       const timeout = setTimeout(() => {
-        document.querySelectorAll('[raycaster]').forEach(el => el.components?.raycaster?.refreshObjects());
+        document.querySelectorAll('[raycaster]').forEach(el => {
+          try {
+            if (el.components?.raycaster?.refreshObjects) {
+              el.components.raycaster.refreshObjects();
+            }
+          } catch (e) {
+            console.warn("A-Frame raycaster refresh warning:", e);
+          }
+        });
       }, 150);
       return () => clearTimeout(timeout);
     }
@@ -34,7 +45,15 @@ export const SceneViewer = () => {
   useEffect(() => {
     if (events.length === 0) return;
     const timeout = setTimeout(() => {
-      document.querySelectorAll('[raycaster]').forEach(el => el.components?.raycaster?.refreshObjects());
+      document.querySelectorAll('[raycaster]').forEach(el => {
+        try {
+          if (el.components?.raycaster?.refreshObjects) {
+            el.components.raycaster.refreshObjects();
+          }
+        } catch (e) {
+          console.warn("A-Frame raycaster refresh warning:", e);
+        }
+      });
     }, 300);
     return () => clearTimeout(timeout);
   }, [events]);
@@ -68,6 +87,9 @@ export const SceneViewer = () => {
         toggleFullscreen={toggleFullscreen}
       />
 
+      <MinimapWidget onOpen={() => setIsMapOpen(true)} />
+      {isMapOpen && <CampusMapPage onClose={() => setIsMapOpen(false)} />}
+
       <a-scene
         webxr="optionalFeatures: hand-tracking, layers; referenceSpaceType: local-floor"
         ref={sceneRef}
@@ -88,17 +110,17 @@ export const SceneViewer = () => {
 
         <VRControls cameraRef={cameraRef} cameraYaw={cameraYaw} enableHandTracking={enableHandTracking} />
 
-        {scene.conexiones.map((conexion) => (
+        {scene.conexiones.map((conexion, index) => (
           <ConnectionMarker
-            key={conexion.targetSubId}
+            key={`${scene.subId}-conn-${conexion.targetSubId}-${index}`}
             conexion={conexion}
             onNavigate={handleNavigationTransition}
           />
         ))}
 
-        {!eventsLoading && !eventsError && events.map((event) => (
+        {!eventsLoading && !eventsError && events.map((event, index) => (
           <EventMarker
-            key={event._id || event.id}
+            key={`${scene.subId}-evt-${event._id || event.id}-${index}`}
             event={event}
             onOpenModal={(ev) => setModalEvent(ev)}
             isHidden={modalEvent != null && (event._id || event.id) === (modalEvent._id || modalEvent.id)}
