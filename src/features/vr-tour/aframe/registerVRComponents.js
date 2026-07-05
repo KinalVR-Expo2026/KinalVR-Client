@@ -244,4 +244,18 @@ export const registerVRComponents = () => {
       }
     });
   }
+
+  // 8. El botón Y del mando izquierdo alterna el mapa del campus en VR
+  // (el botón menú ☰ está reservado por el sistema del Quest).
+  if (!AFRAME.components['map-toggle-button']) {
+    AFRAME.registerComponent('map-toggle-button', {
+      init: function () {
+        this.onYButton = () => window.dispatchEvent(new CustomEvent('vr-map-toggle'));
+        this.el.addEventListener('ybuttondown', this.onYButton);
+      },
+      remove: function () {
+        this.el.removeEventListener('ybuttondown', this.onYButton);
+      }
+    });
+  }
 };

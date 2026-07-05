@@ -65,10 +65,15 @@ export const SceneViewer = () => {
   }, [scheduleStaggeredRefresh]);
 
   // El minimapa 3D de muñeca (vr-minimap) emite este evento al clickearse en VR.
+  // También escucha el botón Y del mando izquierdo (vr-map-toggle) para toggle.
   useEffect(() => {
-    const open = () => setIsVRMapOpen(true);
-    window.addEventListener('vr-minimap-open', open);
-    return () => window.removeEventListener('vr-minimap-open', open);
+    const toggle = () => setIsVRMapOpen((v) => !v);
+    window.addEventListener('vr-minimap-open', toggle);
+    window.addEventListener('vr-map-toggle', toggle);
+    return () => {
+      window.removeEventListener('vr-minimap-open', toggle);
+      window.removeEventListener('vr-map-toggle', toggle);
+    };
   }, []);
 
   if (loading && !isTransitioning) {

@@ -40,6 +40,7 @@ export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
         thumbstick-turning="turnAngle: 45"
         hand-pinch-click
         hand-joystick-turn="speed: 1.5; deadzone: 0.02"
+        map-toggle-button
       >
         {/* Minimapa 3D de muñeca: solo visible en VR. Usa una clase propia
             (`vrmap-target`) para que SOLO la mano derecha lo apunte/clickee — así
