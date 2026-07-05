@@ -19,7 +19,10 @@ import { LEVEL_PLANS } from '../constants/campusMap';
 // recuadro claro alrededor del dibujo. El fondo lo pone quien consume la textura
 // (el panel atenuado del mapa grande, o el disco del radar).
 
-const MAX_DIM = 2048;        // lado mayor del lienzo; subir a 4096 si se ve borroso
+// Lado mayor del lienzo. Con el aspect de los planos (7500/5298) el lienzo
+// queda ~4096x2894 (~63 MB por textura RGBA con mipmaps). Si en Quest hay
+// caídas de FPS o context-loss, bajar a 3072.
+const MAX_DIM = 4096;
 
 // level -> { canvas, aspect, textures:Set<THREE.CanvasTexture> }
 const canvasCache = new Map();
@@ -82,9 +85,32 @@ export const getPlanTexture = (levelNum) => {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.ClampToEdgeWrapping;
   texture.wrapT = THREE.ClampToEdgeWrapping;
+  // Mipmaps + filtrado lineal para que el plano no se vea borroso/aliasado al
+  // alejar el zoom del radar o del mapa grande. WebGL2 soporta mipmaps en NPOT
+  // con ClampToEdgeWrapping (ya seteado arriba).
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   texture.userData.aspect = entry.aspect;
   texture.needsUpdate = true;
 
   entry.textures.add(texture);
   return texture;
+};
+
+// Libera una textura creada por getPlanTexture: la quita del Set de su nivel
+// (buscando en canvasCache la entrada que la contiene) y llama a dispose().
+// Los consumidores lo usan para liberar VRAM al cambiar de nivel; el canvas
+// rasterizado se conserva en canvasCache para que re-visitar el nivel sea
+// barato (no se vuelve a decodificar/dibujar la imagen).
+export const releasePlanTexture = (texture) => {
+  if (!texture) return;
+
+  for (const entry of canvasCache.values()) {
+    if (entry.textures.has(texture)) {
+      entry.textures.delete(texture);
+      break;
+    }
+  }
+  texture.dispose();
 };

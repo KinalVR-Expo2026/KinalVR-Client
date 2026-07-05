@@ -1,4 +1,4 @@
-import { getPlanTexture } from '../utils/planTextures';
+import { getPlanTexture, releasePlanTexture } from '../utils/planTextures';
 import { computeMinimapDegrees } from './registerVRComponents';
 import { buildArrowGeometry } from './arrowGeometry';
 import { useTourStore } from '../store/useTourStore';
@@ -40,7 +40,7 @@ export const registerVRMinimap = () => {
       this.THREE = THREE;
       this.currentLevel = null;
       this.lastUpdate = 0;
-      this.texByLevel = {}; // nivel -> THREE.CanvasTexture (una por nivel)
+      this.tex = null; // textura activa (una sola a la vez, se libera al cambiar de nivel)
       this.cameraEl = this.el.sceneEl.querySelector('[camera]');
 
       const radius = this.data.radius;
@@ -113,18 +113,25 @@ export const registerVRMinimap = () => {
       this.group.visible = this.inVR && hasPos;
       if (!this.inVR || !hasPos) return;
 
-      // Cambio de nivel → cambiar la textura del plano (cacheada por nivel).
+      // Cambio de nivel → cambiar la textura del plano. Solo se mantiene una
+      // textura activa a la vez: la anterior se libera (dispose) para no
+      // acumular VRAM en Quest 3S (a 4096 no caben varias residentes).
       const levelNum = LEVEL_TO_NUM[scene.nivel];
       if (levelNum && levelNum !== this.currentLevel) {
-        let nextTex = this.texByLevel[levelNum];
-        if (!nextTex) {
-          nextTex = getPlanTexture(levelNum);
-          this.texByLevel[levelNum] = nextTex;
-        }
+        const nextTex = getPlanTexture(levelNum);
         if (nextTex) {
+          const renderer = this.el.sceneEl.renderer;
+          if (renderer) {
+            nextTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            nextTex.needsUpdate = true;
+          }
+
+          const prevTex = this.tex;
           this.planoMaterial.map = nextTex;
           this.planoMaterial.needsUpdate = true;
+          this.tex = nextTex;
           this.currentLevel = levelNum;
+          releasePlanTexture(prevTex);
         }
       }
 
@@ -170,8 +177,9 @@ export const registerVRMinimap = () => {
       this.el.removeEventListener('click', this.onClick);
 
       // Liberar recursos GPU. El canvas subyacente vive en la caché de
-      // planTextures; aquí liberamos las texturas y meshes propios.
-      Object.values(this.texByLevel).forEach((t) => t?.dispose());
+      // planTextures; aquí liberamos la textura activa y los meshes propios.
+      releasePlanTexture(this.tex);
+      this.tex = null;
       this.el.removeObject3D('minimap');
       this.group.traverse((obj) => {
         if (obj.isMesh) {
