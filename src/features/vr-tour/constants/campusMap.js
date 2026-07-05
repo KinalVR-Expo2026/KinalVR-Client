@@ -1,7 +1,7 @@
-import nivel1Plano from '../../../assets/img/N1_Final.svg';
-import nivel2Plano from '../../../assets/img/N2_Final.svg';
-import nivel3Plano from '../../../assets/img/N3_Final.svg';
-import nivel4Plano from '../../../assets/img/N4_Final.svg';
+import nivel1Plano from '../../../assets/img/N1_Final.webp';
+import nivel2Plano from '../../../assets/img/N2_Final.webp';
+import nivel3Plano from '../../../assets/img/N3_Final.webp';
+import nivel4Plano from '../../../assets/img/N4_Final.webp';
 
 export const LEVEL_PLANS = {
   1: nivel1Plano,
@@ -10,6 +10,13 @@ export const LEVEL_PLANS = {
   4: nivel4Plano,
 };
 
+// Lienzo compartido por los 4 planos (mismas dimensiones en px que los SVG
+// originales). MapInteractive, MinimapWidget y planTextures asumen que los 4
+// niveles comparten exactamente esta proporción — si se regeneran los WEBP,
+// deben exportarse al mismo tamaño de lienzo (no recortados a su contenido) o
+// las calibraciones de BACKGROUND_CALIBRATION y este aspect ratio se desalinean.
+export const LEVEL_PLAN_ASPECT_CSS = '7500 / 5298';
+
 export const ZOOM_MIN = 50;
 export const ZOOM_MAX = 400;
 export const ZOOM_STEP = 25;
@@ -17,10 +24,10 @@ export const ZOOM_STEP = 25;
 export const LEVEL_TO_NUM = { 'PRIMER NIVEL': 1, 'SEGUNDO NIVEL': 2, 'TERCER NIVEL': 3, 'CUARTO NIVEL': 4 };
 export const NUM_TO_LEVEL = { 1: 'PRIMER NIVEL', 2: 'SEGUNDO NIVEL', 3: 'TERCER NIVEL', 4: 'CUARTO NIVEL' };
 
-// Devuelve el SVG del plano por número de nivel (1-4).
+// Devuelve el plano por número de nivel (1-4).
 export const planForLevelNum = (levelNum) => LEVEL_PLANS[levelNum] || null;
 
-// Devuelve el SVG del plano correspondiente a una escena (a partir de su `nivel`
+// Devuelve el plano correspondiente a una escena (a partir de su `nivel`
 // en string, ej. "SEGUNDO NIVEL"). Fuente única de verdad para el minimapa HTML,
 // el minimapa 3D y el mapa grande — evita duplicar la tabla de planos.
 export const planForScene = (scene) => {

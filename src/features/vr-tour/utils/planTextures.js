@@ -1,19 +1,18 @@
 import { LEVEL_PLANS } from '../constants/campusMap';
 
-// Rasteriza los planos SVG (N1..N4_Final.svg) a un <canvas> y los expone como
-// THREE.CanvasTexture. WebGL no consume SVG de forma fiable como textura, por
-// eso se dibuja el SVG a un canvas una sola vez. Se usa el MISMO asset SVG que
-// el minimapa HTML (constants/campusMap.js), tal como pidió el requerimiento.
+// Rasteriza los planos (N1..N4_Final.webp) a un <canvas> y los expone como
+// THREE.CanvasTexture, usando el MISMO asset que el minimapa HTML
+// (constants/campusMap.js), tal como pidió el requerimiento.
 //
-// Los planos son pesados (N1 ≈ 28 MB), así que el CANVAS se rasteriza a lo sumo
-// una vez por nivel y por sesión (canvasCache). Sobre ese mismo canvas se crean
-// texturas INDEPENDIENTES por consumidor: el radar de muñeca necesita recortar
-// (repeat/offset propios) y el mapa grande muestra el plano completo — como
-// repeat/offset viven en la textura, cada uno necesita su propia instancia.
+// El CANVAS se rasteriza a lo sumo una vez por nivel y por sesión (canvasCache).
+// Sobre ese mismo canvas se crean texturas INDEPENDIENTES por consumidor: el
+// radar de muñeca necesita recortar (repeat/offset propios) y el mapa grande
+// muestra el plano completo — como repeat/offset viven en la textura, cada uno
+// necesita su propia instancia.
 //
-// El canvas conserva la relación de aspecto real del SVG (no lo estira) y esa
+// El canvas conserva la relación de aspecto real del plano (no lo estira) y esa
 // relación se publica en `texture.userData.aspect` (= ancho/alto) para mapear
-// posiciones y dimensionar geometría sin deformar. Vale 1 hasta que el SVG carga.
+// posiciones y dimensionar geometría sin deformar. Vale 1 hasta que la imagen carga.
 
 const MAX_DIM = 2048;        // lado mayor del lienzo; subir a 4096 si se ve borroso
 const BG_COLOR = '#f5f7fb';

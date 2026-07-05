@@ -1,6 +1,7 @@
-import { LEVEL_PLANS, LEVEL_TO_NUM, planForScene } from '../constants/campusMap';
+import { LEVEL_PLANS, LEVEL_PLAN_ASPECT_CSS, LEVEL_TO_NUM, planForScene } from '../constants/campusMap';
 import { MinimapArrow } from './MinimapArrow';
 
+// Ver invariante de lienzo compartido en MapInteractive.jsx.
 const BACKGROUND_CALIBRATION = {
   2: { scale: 2.09, x: '-21.5%', y: '-1%' },
   3: { scale: 2.19, x: '-20%', y: '-2.5%' },
@@ -26,7 +27,7 @@ export const MinimapWidget = ({ currentScene, onOpen }) => {
           style={{
             width: '450%',
             height: 'auto',
-            aspectRatio: '3178/2245',
+            aspectRatio: LEVEL_PLAN_ASPECT_CSS,
             position: 'absolute',
             left: '50%',
             top: '50%',

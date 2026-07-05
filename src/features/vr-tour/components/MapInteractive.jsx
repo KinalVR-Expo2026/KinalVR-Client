@@ -1,6 +1,10 @@
 import { LEVEL_PLANS, LEVEL_TO_NUM } from '../constants/campusMap';
 import { MinimapArrow } from './MinimapArrow';
 
+// Estos offsets asumen que LEVEL_PLANS[2..4] comparten el mismo lienzo/aspect
+// ratio que LEVEL_PLANS[1] (ver LEVEL_PLAN_ASPECT_CSS en constants/campusMap.js).
+// Si alguno se reexporta con otro tamaño, object-contain le mete letterboxing
+// y estos números dejan de alinear con el nivel 1.
 const BACKGROUND_CALIBRATION = {
   2: { scale: 2.09, x: '-21.5%', y: '-1%' },
   3: { scale: 2.19, x: '-20%', y: '-2.5%' },
