@@ -13,18 +13,22 @@ import { AdminOverlay } from './AdminOverlay';
 import { EventModal } from './EventModal';
 import { MinimapWidget } from './MinimapWidget';
 import { CampusMapPage } from '../pages/CampusMapPage';
+import { VRCampusMap } from './VRCampusMap';
 
 export const SceneViewer = () => {
   const wrapperRef = useRef(null);
   const sceneRef = useRef(null);
   const [modalEvent, setModalEvent] = useState(null);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isVRMapOpen, setIsVRMapOpen] = useState(false);
 
   const { scene, loading, cameraYaw, isTransitioning, handleNavigationTransition, cameraRef } = useTourNavigation();
   const { events, eventsLoading, eventsError, activeSkyAssetId, allAssetsToLoad, updateEventCoords } = useSceneData(scene);
   const { isFullscreen, toggleFullscreen, enableHandTracking, isInVR } = useXR(wrapperRef, sceneRef, scene);
 
-  // Refrescar raycasters de A-Frame cuando el escenario o los eventos cambian
+  // Refrescar raycasters de A-Frame una sola vez, tras cargar el escenario y sus
+  // eventos (antes eran dos useEffect separados con temporizadores propios que
+  // disparaban refreshObjects() por duplicado en cada carga de escena).
   useEffect(() => {
     if (scene) {
       const timeout = setTimeout(() => {
@@ -42,6 +46,13 @@ export const SceneViewer = () => {
     }
   }, [scene]);
 
+  // El minimapa 3D de muñeca (vr-minimap) emite este evento al clickearse en VR.
+  useEffect(() => {
+    const open = () => setIsVRMapOpen(true);
+    window.addEventListener('vr-minimap-open', open);
+    return () => window.removeEventListener('vr-minimap-open', open);
+  }, []);
+
   useEffect(() => {
     if (events.length === 0) return;
     const timeout = setTimeout(() => {
@@ -56,7 +67,7 @@ export const SceneViewer = () => {
       });
     }, 300);
     return () => clearTimeout(timeout);
-  }, [events]);
+  }, [scene, events]);
 
   if (loading && !isTransitioning) {
     return (
@@ -87,8 +98,9 @@ export const SceneViewer = () => {
         toggleFullscreen={toggleFullscreen}
       />
 
-      <MinimapWidget onOpen={() => setIsMapOpen(true)} />
-      {isMapOpen && <CampusMapPage onClose={() => setIsMapOpen(false)} />}
+      {/* UI devuelta a su lugar correcto, fuera del 3D */}
+      <MinimapWidget currentScene={scene} onOpen={() => setIsMapOpen(true)} />
+      {isMapOpen && <CampusMapPage onClose={() => setIsMapOpen(false)} currentScene={scene} />}
 
       <a-scene
         webxr="optionalFeatures: hand-tracking, layers; referenceSpaceType: local-floor"
@@ -108,7 +120,12 @@ export const SceneViewer = () => {
 
         <a-sky src={activeSkyAssetId ? `#${activeSkyAssetId}` : `#${skyAssetId}`} rotation="0 -90 0" crossOrigin="anonymous"></a-sky>
 
-        <VRControls cameraRef={cameraRef} cameraYaw={cameraYaw} enableHandTracking={enableHandTracking} />
+        <VRControls
+          cameraRef={cameraRef}
+          cameraYaw={cameraYaw}
+          enableHandTracking={enableHandTracking}
+          sceneOffset={scene.coordinacionAngulo || 0}
+        />
 
         {scene.conexiones.map((conexion, index) => (
           <ConnectionMarker
@@ -129,6 +146,10 @@ export const SceneViewer = () => {
 
         {isInVR && modalEvent && (
           <VREventDetailPanel event={modalEvent} cameraRef={cameraRef} onClose={() => setModalEvent(null)} />
+        )}
+
+        {isInVR && isVRMapOpen && (
+          <VRCampusMap cameraRef={cameraRef} onClose={() => setIsVRMapOpen(false)} />
         )}
       </a-scene>
 
