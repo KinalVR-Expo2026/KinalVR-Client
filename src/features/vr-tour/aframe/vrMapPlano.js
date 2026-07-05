@@ -4,6 +4,12 @@ import { buildArrowGeometry } from './arrowGeometry';
 import { useTourStore } from '../store/useTourStore';
 import { BACKGROUND_CALIBRATION, LEVEL_TO_NUM } from '../constants/campusMap';
 
+// --- T7: zoom doble-tap + arrastre con grip (constantes calibrables) ---
+const ZOOM_SCALE = 2.5;        // factor de zoom-in
+const DOUBLE_TAP_MS = 400;     // ventana temporal para el doble-tap
+const DOUBLE_TAP_UV_DIST = 0.08; // distancia UV máx. entre los dos taps
+const DEDUPE_MS = 50;          // ignora clicks duplicados del mismo gesto (hand-pinch)
+
 // Componente del plano grande del mapa del campus en VR (contraparte 3D del tab
 // "Mapa" de CampusMapPage / MapInteractive). Replica el "overlay" de escritorio:
 // el nivel 1 SIEMPRE se dibuja de base y, si el nivel activo no es el 1, encima
@@ -119,6 +125,39 @@ export const registerVRMapPlano = () => {
       }
 
       this.applyOverlayTexture();
+
+      // --- T7: estado de zoom/arrastre ---
+      this.isZoomed = false;
+      this.lastClick = null;      // { t, u, v } del último click válido (para doble-tap)
+      this.lastClickAt = 0;       // timestamp del último click (dedupe)
+      this.dragHand = null;       // entidad de mano que sostiene el grip (o null)
+      this.dragPrevPoint = null;  // punto local (padre del zoomGroup) del frame anterior
+      this._tmpV3 = new THREE.Vector3();
+
+      // Listener de click del host: resuelve teleport (T8), doble-tap (zoom) o
+      // simple tap (arma el doble-tap). Ver onHostClick.
+      this.onHostClick = this.onHostClick.bind(this);
+      this.el.addEventListener('click', this.onHostClick);
+
+      // Grip de las manos para el arrastre (solo con zoom). Ningún otro componente
+      // usa grip en el proyecto, así que el gesto queda libre. Se enlazan lazy a
+      // las entidades [laser-controls]; si aún no existen, reintenta en el tick.
+      this.onGripDown = this.onGripDown.bind(this);
+      this.onGripUp = this.onGripUp.bind(this);
+      this.gripHands = [];
+      this.bindGripHands();
+    },
+
+    // Enlaza gripdown/gripup a las dos manos. Idempotente: solo enlaza las manos
+    // que aún no estén en gripHands (por si al init todavía no existían).
+    bindGripHands: function () {
+      const hands = document.querySelectorAll('[laser-controls]');
+      hands.forEach((hand) => {
+        if (this.gripHands.includes(hand)) return;
+        hand.addEventListener('gripdown', this.onGripDown);
+        hand.addEventListener('gripup', this.onGripUp);
+        this.gripHands.push(hand);
+      });
     },
 
     applyAnisotropy: function (tex) {
@@ -139,6 +178,9 @@ export const registerVRMapPlano = () => {
     applyOverlayTexture: function () {
       const level = this.data.level;
       if (level === this.currentLevel) return;
+
+      // Cambiar de nivel con zoom activo → resetear el encuadre (evita confusión).
+      if (this.isZoomed) this.zoomOut();
 
       const prevTex = this.overlayTex;
 
@@ -208,6 +250,131 @@ export const registerVRMapPlano = () => {
       this.baseMaterial.needsUpdate = true;
     },
 
+    // --- T7: zoom ---
+
+    // Clampa una posición de paneo del zoomGroup para que el plano no se salga
+    // del encuadre. maxX/Y = (S-1)*dim/2 con el tamaño del plano W×H.
+    clampPan: function (pos) {
+      const S = this.zoomGroup.scale.x;
+      const maxX = ((S - 1) * this.width) / 2;
+      const maxY = ((S - 1) * this.height) / 2;
+      pos.x = Math.min(maxX, Math.max(-maxX, pos.x));
+      pos.y = Math.min(maxY, Math.max(-maxY, pos.y));
+    },
+
+    // Zoom-in centrado en el punto tocado (coords locales del PADRE del zoomGroup)
+    // para que ese punto quede fijo bajo el dedo. Aplica clamp de paneo.
+    zoomInAt: function (worldPoint) {
+      const parent = this.zoomGroup.parent;
+      if (!parent) return;
+      const p = parent.worldToLocal(worldPoint.clone());
+      const S = ZOOM_SCALE;
+      this.zoomGroup.scale.set(S, S, 1);
+      this.zoomGroup.position.set(p.x * (1 - S), p.y * (1 - S), 0);
+      this.clampPan(this.zoomGroup.position);
+      this.isZoomed = true;
+    },
+
+    zoomOut: function () {
+      this.zoomGroup.scale.set(1, 1, 1);
+      this.zoomGroup.position.set(0, 0, 0);
+      this.isZoomed = false;
+    },
+
+    onHostClick: function (evt) {
+      const now = performance.now();
+      // Dedupe: hand-pinch-click emite click+mousedown casi juntos para el mismo
+      // gesto → ignorar cualquier click a < DEDUPE_MS del anterior.
+      if (now - this.lastClickAt < DEDUPE_MS) return;
+      this.lastClickAt = now;
+
+      const intersection = evt.detail?.intersection;
+      const point = intersection?.point;
+
+      // T8: ¿cayó sobre un dot de teletransporte? (hit-test en espacio overlay).
+      // Se rellena en T8; por ahora hitTestTeleport devuelve null.
+      if (point) {
+        const subId = this.hitTestTeleport(point);
+        if (subId) {
+          this.el.emit('map-teleport', { subId });
+          return; // no cuenta para el doble-tap
+        }
+      }
+
+      // Coordenadas UV para medir la distancia entre taps (fallback a point.xy).
+      const uv = intersection?.uv;
+      const u = uv ? uv.x : (point ? point.x : 0);
+      const v = uv ? uv.y : (point ? point.y : 0);
+
+      const last = this.lastClick;
+      const isDouble = last &&
+        (now - last.t) < DOUBLE_TAP_MS &&
+        Math.hypot(u - last.u, v - last.v) < DOUBLE_TAP_UV_DIST;
+
+      if (isDouble) {
+        if (this.isZoomed) {
+          this.zoomOut();
+        } else if (point) {
+          this.zoomInAt(point);
+        }
+        this.lastClick = null; // consumido: no encadenar triple-tap
+      } else {
+        this.lastClick = { t: now, u, v };
+      }
+    },
+
+    // Placeholder T8: se sobrescribe la lógica en applyOverlayTexture/tick de T8.
+    hitTestTeleport: function () {
+      return null;
+    },
+
+    // --- T7: arrastre con grip ---
+
+    onGripDown: function (evt) {
+      if (!this.isZoomed) return; // el arrastre solo tiene sentido con zoom
+      this.dragHand = evt.target;
+      this.dragPrevPoint = null; // se ancla en el primer frame que intersecte
+    },
+
+    onGripUp: function (evt) {
+      if (this.dragHand === evt.target) {
+        this.dragHand = null;
+        this.dragPrevPoint = null;
+      }
+    },
+
+    // Devuelve el punto de intersección (mundo) del rayo de la mano con el mesh
+    // del host, o null si no intersecta. Usa el raycaster de A-Frame de la mano.
+    getHandIntersectionPoint: function (hand) {
+      const rc = hand?.components?.raycaster;
+      if (!rc) return null;
+      const inter = rc.getIntersection ? rc.getIntersection(this.el) : null;
+      return inter?.point || null;
+    },
+
+    // Se llama en el tick cuando hay una mano arrastrando: traslada el zoomGroup
+    // por el DELTA del punto tocado entre frames (en el espacio del padre) y
+    // aplica el clamp. Si el rayo deja de intersectar, congela (espera a que
+    // vuelva y re-ancla) — no salta.
+    updateDrag: function () {
+      const point = this.getHandIntersectionPoint(this.dragHand);
+      if (!point) {
+        // Fuera del plano a mitad del gesto: congelar y re-anclar al volver.
+        this.dragPrevPoint = null;
+        return;
+      }
+      const parent = this.zoomGroup.parent;
+      if (!parent) return;
+      const local = parent.worldToLocal(point.clone());
+
+      if (this.dragPrevPoint) {
+        this.zoomGroup.position.x += local.x - this.dragPrevPoint.x;
+        this.zoomGroup.position.y += local.y - this.dragPrevPoint.y;
+        this.clampPan(this.zoomGroup.position);
+      }
+      this.dragPrevPoint = local;
+    },
+
     tick: function () {
       const aspect = this.baseTex?.userData?.aspect || this.overlayTex?.userData?.aspect || 1;
       const width = this.data.height * aspect;
@@ -220,6 +387,12 @@ export const registerVRMapPlano = () => {
         this.el.setAttribute('height', height);
         this.layout(width, height);
       }
+
+      // Grip aún sin enlazar (manos que aparecieron tras el init) → reintentar.
+      if (this.gripHands.length < 2) this.bindGripHands();
+
+      // Arrastre con grip (solo con zoom).
+      if (this.dragHand && this.isZoomed) this.updateDrag();
 
       // Flecha del usuario: solo si el nivel mostrado es el de la escena actual.
       const state = useTourStore.getState();
@@ -237,6 +410,14 @@ export const registerVRMapPlano = () => {
     },
 
     remove: function () {
+      // Listeners de interacción (T7).
+      this.el.removeEventListener('click', this.onHostClick);
+      this.gripHands.forEach((hand) => {
+        hand.removeEventListener('gripdown', this.onGripDown);
+        hand.removeEventListener('gripup', this.onGripUp);
+      });
+      this.gripHands = [];
+
       this.el.removeObject3D('zoom-group');
 
       // Meshes/geometrías/materiales propios.
