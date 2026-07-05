@@ -5,18 +5,19 @@ import { AdminSidebar } from '../components/AdminSidebar';
 import { MapInteractive } from '../components/MapInteractive';
 import { getScenes, updateScenePosition } from '../../../shared/api/scenes';
 import { LEVEL_TO_NUM, NUM_TO_LEVEL, ZOOM_MIN, ZOOM_MAX } from '../constants/campusMap';
+import { useTourStore } from '../store/useTourStore';
 
-export const CampusMapPage = ({ onClose, currentScene }) => {
+export const CampusMapPage = ({ onClose, currentScene, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('mapa');
   const [activeLevel, setActiveLevel] = useState(
     () => (currentScene?.nivel && LEVEL_TO_NUM[currentScene.nivel]) || 3
   );
   const [zoom, setZoom] = useState(100);
   const [scenes, setScenes] = useState([]);
-  const [selectedSubId, setSelectedSubId] = useState('');
-  const [tempPos, setTempPos] = useState(null);
-  const [tempAngle, setTempAngle] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [selectedSubId, setSelectedSubId] = useState(() => currentScene?.subId || '');
+  const [tempPos, setTempPos] = useState(() => (currentScene?.posicion && currentScene.posicion.length > 0) ? currentScene.posicion : null);
+  const [tempAngle, setTempAngle] = useState(() => currentScene?.coordinacionAngulo || 0);
+  const [savingStatus, setSavingStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
   const [userRotation] = useState(() => {
     const minimap = document.getElementById('minimap-container');
     return minimap?.style.getPropertyValue('--minimap-rotation') || '0deg';
@@ -61,39 +62,52 @@ export const CampusMapPage = ({ onClose, currentScene }) => {
     }
   };
 
-  const handleMapClick = (e) => {
-    if (activeTab !== 'admin' || !selectedSubId) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setTempPos([Number(x.toFixed(2)), Number(y.toFixed(2))]);
-  };
-
-  const handleSavePosition = async () => {
-    if (!selectedSubId || !tempPos) return;
-
-    setLoading(true);
+  const autoSavePositionAndAngle = async (position, angle) => {
+    if (!selectedSubId || !position) return;
+    setSavingStatus('saving');
     try {
       await updateScenePosition({
         subId: selectedSubId,
-        posicion: tempPos,
+        posicion: position,
         nivel: NUM_TO_LEVEL[activeLevel],
-        coordinacionAngulo: Number(tempAngle),
+        coordinacionAngulo: Number(angle),
       });
 
       setScenes((prev) =>
         prev.map((scene) =>
           scene.subId === selectedSubId
-            ? { ...scene, posicion: tempPos, nivel: NUM_TO_LEVEL[activeLevel], coordinacionAngulo: Number(tempAngle) }
+            ? { ...scene, posicion: position, nivel: NUM_TO_LEVEL[activeLevel], coordinacionAngulo: Number(angle) }
             : scene
         )
       );
-      alert('Posición guardada exitosamente');
+      useTourStore.getState().updateScenePositionInCache(selectedSubId, position, Number(angle));
+      setSavingStatus('saved');
+      setTimeout(() => setSavingStatus('idle'), 2000);
     } catch (error) {
-      console.error('Error al guardar la posición:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error al autoguardar la posición:', error);
+      setSavingStatus('error');
     }
+  };
+
+  const handleMapClick = async (e) => {
+    if (activeTab !== 'admin' || !selectedSubId) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const newPos = [Number(x.toFixed(2)), Number(y.toFixed(2))];
+    setTempPos(newPos);
+    await autoSavePositionAndAngle(newPos, tempAngle);
+  };
+
+  const handleAngleChangeEnd = async (angle) => {
+    await autoSavePositionAndAngle(tempPos, angle);
+  };
+
+  const handleTeleport = (subId) => {
+    if (onNavigate) {
+      onNavigate(subId);
+    }
+    onClose();
   };
 
   return (
@@ -128,8 +142,8 @@ export const CampusMapPage = ({ onClose, currentScene }) => {
                 tempPos={tempPos}
                 tempAngle={tempAngle}
                 setTempAngle={setTempAngle}
-                handleSavePosition={handleSavePosition}
-                loading={loading}
+                handleAngleChangeEnd={handleAngleChangeEnd}
+                savingStatus={savingStatus}
               />
             )}
 
@@ -144,6 +158,8 @@ export const CampusMapPage = ({ onClose, currentScene }) => {
               isMapTab={isMapTab}
               currentScene={currentScene}
               userRotation={userRotation}
+              scenes={scenes}
+              onTeleport={handleTeleport}
             />
           </div>
 

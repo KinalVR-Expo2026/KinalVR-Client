@@ -153,6 +153,20 @@ export const useTourStore = create((set, get) => ({
     });
   },
 
+  updateScenePositionInCache: (sceneSubId, position, angle) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return {};
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, posicion: position, coordinacionAngulo: angle }
+        }
+      };
+    });
+  },
+
   addConnection: (sceneSubId, targetSubId) => {
     const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
     const tId = targetSubId ? targetSubId.trim() : targetSubId;
