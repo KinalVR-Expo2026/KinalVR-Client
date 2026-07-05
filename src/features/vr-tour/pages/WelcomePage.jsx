@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTourStore } from '../store/useTourStore';
+import { markExperienceStarted } from '../session/experienceSession';
 
 const NUMERALS = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
@@ -165,7 +166,13 @@ export const WelcomePage = () => {
       </div>
 
       <TopBar />
-      <HeroContent onStart={() => navigate('/dashboard')} isReady={isReady} />
+      <HeroContent
+        onStart={() => {
+          markExperienceStarted();
+          navigate('/dashboard');
+        }}
+        isReady={isReady}
+      />
     </div>
   );
 };

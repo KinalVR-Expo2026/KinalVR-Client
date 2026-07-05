@@ -13,9 +13,13 @@ import { LEVEL_PLANS } from '../constants/campusMap';
 // El canvas conserva la relación de aspecto real del plano (no lo estira) y esa
 // relación se publica en `texture.userData.aspect` (= ancho/alto) para mapear
 // posiciones y dimensionar geometría sin deformar. Vale 1 hasta que la imagen carga.
+//
+// El canvas se mantiene TRANSPARENTE (clearRect, no un relleno de color): los
+// planos webp traen canal alfa (fondo transparente) y rellenarlo pintaba un
+// recuadro claro alrededor del dibujo. El fondo lo pone quien consume la textura
+// (el panel atenuado del mapa grande, o el disco del radar).
 
 const MAX_DIM = 2048;        // lado mayor del lienzo; subir a 4096 si se ve borroso
-const BG_COLOR = '#f5f7fb';
 
 // level -> { canvas, aspect, textures:Set<THREE.CanvasTexture> }
 const canvasCache = new Map();
@@ -29,8 +33,7 @@ const ensureCanvas = (levelNum) => {
   canvas.width = MAX_DIM;
   canvas.height = MAX_DIM;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = BG_COLOR;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const entry = { canvas, aspect: 1, textures: new Set() };
   canvasCache.set(levelNum, entry);
@@ -49,8 +52,7 @@ const ensureCanvas = (levelNum) => {
     const ch = aspect >= 1 ? Math.round(MAX_DIM / aspect) : MAX_DIM;
     canvas.width = cw;
     canvas.height = ch;
-    ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, cw, ch);
+    ctx.clearRect(0, 0, cw, ch);
     ctx.drawImage(img, 0, 0, cw, ch);
 
     entry.aspect = aspect;
