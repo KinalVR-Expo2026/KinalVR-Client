@@ -3,17 +3,25 @@ import { registerVRMapPlano } from '../aframe/vrMapPlano';
 import { useTourStore } from '../store/useTourStore';
 import { LEVEL_TO_NUM, LEVEL_PLAN_ASPECT_CSS } from '../constants/campusMap';
 import { VRBackdrop } from './VRBackdrop';
+import { VRLevelSelector } from './VRLevelSelector';
 
 // Mapa grande del campus dentro de VR (contraparte 3D del tab "Mapa" de
 // CampusMapPage). Se abre al clickear el minimapa de muñeca y muestra el plano
 // completo del nivel, botones para cambiar de piso y la flecha del usuario.
 // Solo cubre el tab Mapa en v1; Admin/Eventos siguen en escritorio.
 //
-// `billboard` mantiene el panel siempre rotado hacia el usuario (estático en
-// posición, solo gira) y `VRBackdrop` lo cierra al tocar cualquier punto fuera
-// de él — mismo patrón que VREventDetailPanel. Sin marco/tarjeta: el plano del
-// mapa es el protagonista, con una atenuación suave detrás para que no se
-// pierda contra el fondo 360.
+// Estructura: root (posición en el mundo + `billboard`, que solo escribe
+// rotation.y) > tiltGroup (rotation.x fijo, inclinación tipo mesa de dibujo,
+// sobrevive porque billboard no toca X) > contenido visual del panel
+// (atenuación, plano del mapa, catcher, selector de niveles). `VRBackdrop`
+// cuelga directo del root — es la cortina de cierre, no parte del panel — y
+// se cierra al tocar cualquier punto fuera de él, mismo patrón que
+// VREventDetailPanel. Sin marco/tarjeta ni título: el plano del mapa es el
+// protagonista, con una atenuación suave detrás para que no se pierda contra
+// el fondo 360. Una tarea posterior añade un zoomGroup dentro del tiltGroup.
+//
+// El panel se coloca cerca y a la altura de los ojos del usuario para que se
+// sienta como sostener un mapa en las manos.
 //
 // Todas las medidas/posiciones son ajustables — requieren calibración en casco.
 
@@ -24,7 +32,14 @@ const PANEL_HEIGHT = 1.2;
 // Misma proporción que los 4 planos (invariante documentado en campusMap.js).
 const [ASPECT_W, ASPECT_H] = LEVEL_PLAN_ASPECT_CSS.split('/').map(Number);
 const MAP_ASPECT = ASPECT_W / ASPECT_H;
-const MAP_WIDTH = PANEL_HEIGHT * MAP_ASPECT;
+export const MAP_WIDTH = PANEL_HEIGHT * MAP_ASPECT;
+
+// Distancia del panel frente a la cámara al abrir — calibrable 0.9-1.15.
+const PANEL_DISTANCE = 1.0;
+
+// Inclinación del tiltGroup — calibrable -28…-38; negativo = borde superior
+// alejándose, tipo mesa de dibujo.
+const PANEL_TILT_DEG = -32;
 
 const BG_MARGIN = 0.15;
 const BG_WIDTH = MAP_WIDTH + BG_MARGIN;
@@ -50,50 +65,9 @@ const CATCHER_CY = (CATCHER_Y_MIN + CATCHER_Y_MAX) / 2;
 const CATCHER_W = CATCHER_X_MAX - CATCHER_X_MIN;
 const CATCHER_H = CATCHER_Y_MAX - CATCHER_Y_MIN;
 
-// Botón 3D clickeable (láser/pellizco), con el patrón ref + addEventListener que
-// usa el resto del tour (ver ConnectionMarker). Bloques sólidos en blanco; el
-// activo se resalta en naranja — mismos colores que el selector de escritorio
-// (MapInteractive.jsx: bg-orange-500 activo / bg-slate-100 inactivo).
-const VRButton = ({ label, active, onSelect, position, width = 0.26, height = 0.22 }) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const handle = (e) => {
-      e.stopPropagation?.();
-      onSelect();
-    };
-    el.addEventListener('click', handle);
-    el.addEventListener('mousedown', handle);
-    el.addEventListener('touchstart', handle);
-    return () => {
-      el.removeEventListener('click', handle);
-      el.removeEventListener('mousedown', handle);
-      el.removeEventListener('touchstart', handle);
-    };
-  }, [onSelect]);
-
-  return (
-    <a-entity
-      ref={ref}
-      className="clickable"
-      position={position}
-      geometry={`primitive: plane; width: ${width}; height: ${height}`}
-      material={`shader: flat; color: ${active ? '#ea580c' : '#e2e8f0'}; opacity: 1; side: double`}
-    >
-      <a-text
-        value={label}
-        align="center"
-        position="0 0 0.01"
-        color={active ? '#ffffff' : '#1e293b'}
-        scale="0.5 0.5 0.5"
-      ></a-text>
-    </a-entity>
-  );
-};
-
 export const VRCampusMap = ({ cameraRef, onClose }) => {
   const rootRef = useRef(null);
+  const tiltGroupRef = useRef(null);
 
   const [activeLevel, setActiveLevel] = useState(() => {
     const state = useTourStore.getState();
@@ -118,7 +92,18 @@ export const VRCampusMap = ({ cameraRef, onClose }) => {
     const pos = new THREE.Vector3();
     camObj.getWorldPosition(pos);
 
-    root.object3D.position.copy(pos.add(forward.multiplyScalar(1.6)));
+    // Capturar la Y de la cámara ANTES de mutar `pos` con el forward.
+    const camY = pos.y;
+
+    root.object3D.position.copy(pos.add(forward.multiplyScalar(PANEL_DISTANCE)));
+
+    // Altura a nivel de ojos: usar la Y real de la cámara (local-floor la da
+    // correcta) con un fallback razonable si el casco no reporta nada útil.
+    const EYE_FALLBACK = 1.65; // si el casco no da altura útil
+    const HEIGHT_OFFSET = -0.1; // centro del mapa un pelo bajo la vista (calibrable)
+    const eyeY = Number.isFinite(camY) && camY > 0.5 ? camY : EYE_FALLBACK;
+    root.object3D.position.y = Math.min(2.2, Math.max(1.0, eyeY + HEIGHT_OFFSET));
+
     const euler = new THREE.Euler().setFromQuaternion(quat, 'YXZ');
     root.object3D.rotation.set(0, euler.y, 0);
   }, [cameraRef]);
@@ -127,63 +112,47 @@ export const VRCampusMap = ({ cameraRef, onClose }) => {
     <a-entity ref={rootRef} billboard>
       <VRBackdrop onClose={onClose} />
 
-      {/* Atrapa-rayos del panel: clickable, invisible, sin handler. Solo existe
-          para que los toques DENTRO del panel no lleguen al backdrop de cierre. */}
-      <a-plane
-        className="clickable"
-        width={CATCHER_W}
-        height={CATCHER_H}
-        position={`${CATCHER_CX} ${CATCHER_CY} -0.015`}
-        material="shader: flat; opacity: 0; transparent: true; side: double"
-      ></a-plane>
+      {/* tiltGroup: inclina todo el panel visual como una mesa de dibujo
+          técnico. `billboard` (en el root) solo escribe rotation.y, así que
+          esta rotation.x sobrevive intacta. Una tarea posterior añade un
+          zoomGroup dentro de este grupo. */}
+      <a-entity ref={tiltGroupRef} rotation={`${PANEL_TILT_DEG} 0 0`}>
+        {/* Atrapa-rayos del panel: clickable, invisible, sin handler. Solo existe
+            para que los toques DENTRO del panel no lleguen al backdrop de cierre. */}
+        <a-plane
+          className="clickable"
+          width={CATCHER_W}
+          height={CATCHER_H}
+          position={`${CATCHER_CX} ${CATCHER_CY} -0.015`}
+          material="shader: flat; opacity: 0; transparent: true; side: double"
+        ></a-plane>
 
-      {/* Atenuación suave detrás del plano — sin marco ni esquineros, solo
-          para que el mapa no se pierda contra el fondo 360 */}
-      <a-plane
-        width={BG_WIDTH}
-        height={BG_HEIGHT}
-        position={`0 ${BG_CENTER_Y} -0.03`}
-        material="shader: flat; color: #0c0f1e; opacity: 0.55; transparent: true; side: double"
-      ></a-plane>
+        {/* Atenuación suave detrás del plano — sin marco ni esquineros, solo
+            para que el mapa no se pierda contra el fondo 360 */}
+        <a-plane
+          width={BG_WIDTH}
+          height={BG_HEIGHT}
+          position={`0 ${BG_CENTER_Y} -0.03`}
+          material="shader: flat; color: #0c0f1e; opacity: 0.55; transparent: true; side: double"
+        ></a-plane>
 
-      <a-text
-        value="MAPA DEL CAMPUS"
-        align="center"
-        position={`0 ${BG_TOP + 0.12} 0`}
-        color="#e0e4eb"
-        scale="0.6 0.6 0.6"
-      ></a-text>
+        {/* Plano del nivel (textura + flecha del usuario las maneja vr-map-plano) */}
+        <a-plane
+          vr-map-plano={`level: ${activeLevel}; height: ${PANEL_HEIGHT}`}
+          position={`0 ${BG_CENTER_Y} 0`}
+          material="shader: flat; color: #ffffff; side: double"
+        ></a-plane>
 
-      {/* Plano del nivel (textura + flecha del usuario las maneja vr-map-plano) */}
-      <a-plane
-        vr-map-plano={`level: ${activeLevel}; height: ${PANEL_HEIGHT}`}
-        position={`0 ${BG_CENTER_Y} 0`}
-        material="shader: flat; color: #ffffff; side: double"
-      ></a-plane>
-
-      {/* Selector de niveles: columna a la derecha del mapa, afuera de su área,
-          orden ascendente de abajo hacia arriba (1 abajo … 4 arriba) — mismo
-          orden que el selector de escritorio, solo vertical junto al mapa en
-          vez de aparte. */}
-      {[1, 2, 3, 4].map((level, i) => (
-        <VRButton
-          key={level}
-          label={String(level)}
-          active={activeLevel === level}
-          onSelect={() => setActiveLevel(level)}
-          position={`${BUTTON_X} ${BG_CENTER_Y - 0.45 + i * BUTTON_STEP} 0.02`}
+        <VRLevelSelector
+          activeLevel={activeLevel}
+          onSelectLevel={setActiveLevel}
+          onClose={onClose}
+          buttonX={BUTTON_X}
+          centerY={BG_CENTER_Y}
+          step={BUTTON_STEP}
+          topY={BG_TOP}
         />
-      ))}
-
-      {/* Cerrar */}
-      <VRButton
-        label="X"
-        active={false}
-        onSelect={onClose}
-        position={`${MAP_WIDTH / 2 - 0.05} ${BG_TOP - 0.05} 0.02`}
-        width={0.2}
-        height={0.2}
-      />
+      </a-entity>
     </a-entity>
   );
 };
