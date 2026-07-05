@@ -68,6 +68,7 @@ const CATCHER_H = CATCHER_Y_MAX - CATCHER_Y_MIN;
 export const VRCampusMap = ({ cameraRef, onClose }) => {
   const rootRef = useRef(null);
   const tiltGroupRef = useRef(null);
+  const planoRef = useRef(null);
 
   const [activeLevel, setActiveLevel] = useState(() => {
     const state = useTourStore.getState();
@@ -136,11 +137,16 @@ export const VRCampusMap = ({ cameraRef, onClose }) => {
           material="shader: flat; color: #0c0f1e; opacity: 0.55; transparent: true; side: double"
         ></a-plane>
 
-        {/* Plano del nivel (textura + flecha del usuario las maneja vr-map-plano) */}
+        {/* Plano del nivel. vr-map-plano dibuja base+overlay+flecha (+dots) en un
+            zoomGroup interno; el a-plane host queda TRANSPARENTE (opacity 0) pero
+            conserva su geometría W×H y className="clickable" para ser la superficie
+            de raycast del zoom, arrastre y hit-test de los dots de teletransporte. */}
         <a-plane
+          ref={planoRef}
+          className="clickable"
           vr-map-plano={`level: ${activeLevel}; height: ${PANEL_HEIGHT}`}
           position={`0 ${BG_CENTER_Y} 0`}
-          material="shader: flat; color: #ffffff; side: double"
+          material="shader: flat; color: #ffffff; opacity: 0; transparent: true; side: double"
         ></a-plane>
 
         <VRLevelSelector

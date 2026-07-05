@@ -17,6 +17,19 @@ export const LEVEL_PLANS = {
 // las calibraciones de BACKGROUND_CALIBRATION y este aspect ratio se desalinean.
 export const LEVEL_PLAN_ASPECT_CSS = '7500 / 5298';
 
+// Calibración de los planos 2..4 sobre el lienzo del nivel 1 (que hace de base).
+// Estos offsets asumen que LEVEL_PLANS[2..4] comparten el mismo lienzo/aspect
+// ratio que LEVEL_PLANS[1] (ver LEVEL_PLAN_ASPECT_CSS arriba). Si alguno se
+// reexporta con otro tamaño, object-contain le mete letterboxing y estos números
+// dejan de alinear con el nivel 1. Fuente única de verdad: la usan el mapa de
+// escritorio (MapInteractive), el minimapa HTML (MinimapWidget) y el mapa grande
+// en VR (vrMapPlano), que traduce estos %/scale del CSS a transformaciones THREE.
+export const BACKGROUND_CALIBRATION = {
+  2: { scale: 2.09, x: '-21.5%', y: '-1%' },
+  3: { scale: 2.19, x: '-20%', y: '-2.5%' },
+  4: { scale: 4.97, x: '-9%', y: '5.5%' },
+};
+
 export const ZOOM_MIN = 50;
 export const ZOOM_MAX = 400;
 export const ZOOM_STEP = 25;

@@ -1,12 +1,5 @@
-import { LEVEL_PLANS, LEVEL_PLAN_ASPECT_CSS, LEVEL_TO_NUM, planForScene } from '../constants/campusMap';
+import { BACKGROUND_CALIBRATION, LEVEL_PLANS, LEVEL_PLAN_ASPECT_CSS, LEVEL_TO_NUM, planForScene } from '../constants/campusMap';
 import { MinimapArrow } from './MinimapArrow';
-
-// Ver invariante de lienzo compartido en MapInteractive.jsx.
-const BACKGROUND_CALIBRATION = {
-  2: { scale: 2.09, x: '-21.5%', y: '-1%' },
-  3: { scale: 2.19, x: '-20%', y: '-2.5%' },
-  4: { scale: 4.97, x: '-9%', y: '5.5%' },
-};
 
 export const MinimapWidget = ({ currentScene, onOpen }) => {
   const hasPosition = Boolean(currentScene?.posicion && currentScene.posicion.length > 0);
