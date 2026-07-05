@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { LEVEL_PLANS, LEVEL_TO_NUM } from '../constants/campusMap';
 import { MinimapArrow } from './MinimapArrow';
 
@@ -22,7 +23,10 @@ export const MapInteractive = ({
   isMapTab,
   currentScene,
   userRotation,
+  scenes = [],
+  onTeleport,
 }) => {
+  const [teleportTarget, setTeleportTarget] = useState(null);
   const calc = activeLevel !== 1 ? BACKGROUND_CALIBRATION[activeLevel] : null;
 
   return (
@@ -60,20 +64,20 @@ export const MapInteractive = ({
 
           {isAdminTab && tempPos && (
             <div
-              className="pointer-events-none absolute flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-t-4 border-t-red-700 border-red-500 bg-red-500/20 shadow-sm"
+              className="absolute z-20 h-8 w-8"
               style={{
                 left: `${tempPos[0]}%`,
                 top: `${tempPos[1]}%`,
                 transform: `translate(-50%, -50%) rotate(${tempAngle}deg)`,
               }}
             >
-              <div className="h-1.5 w-1.5 rounded-full bg-red-600"></div>
+              <MinimapArrow />
             </div>
           )}
 
           {isMapTab && currentScene?.posicion && activeLevel === LEVEL_TO_NUM[currentScene.nivel] && (
             <div
-              className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-8 w-8"
+              className="pointer-events-none absolute z-20 h-8 w-8"
               style={{
                 left: `${currentScene.posicion[0]}%`,
                 top: `${currentScene.posicion[1]}%`,
@@ -83,6 +87,40 @@ export const MapInteractive = ({
               <MinimapArrow />
             </div>
           )}
+
+          {/* Minimalist Scene Dots on current level */}
+          {isMapTab && scenes
+            .filter((s) => s.nivel && LEVEL_TO_NUM[s.nivel] === activeLevel && s.posicion && s.posicion.length >= 2 && !(s.posicion[0] === 0 && s.posicion[1] === 0))
+            .map((s) => {
+              // Exclude active scene from showing dot (since arrow covers it)
+              const isActive = currentScene && s.subId === currentScene.subId && activeLevel === LEVEL_TO_NUM[currentScene.nivel];
+              if (isActive) return null;
+
+              return (
+                <div
+                  key={s.subId}
+                  className="absolute z-20 cursor-pointer pointer-events-auto group"
+                  style={{
+                    left: `${s.posicion[0]}%`,
+                    top: `${s.posicion[1]}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  onClick={() => setTeleportTarget(s)}
+                  onDoubleClick={() => onTeleport?.(s.subId)}
+                >
+                  {/* Minimalist Dot Node */}
+                  <div className="relative flex h-3 w-3 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-orange-400/30 animate-pulse"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500 border border-white shadow-sm transition-transform duration-200 group-hover:scale-125 group-hover:bg-orange-400"></span>
+                  </div>
+
+                  {/* Tooltip on Hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-30 bg-slate-900/90 text-white text-[10px] font-semibold py-1 px-2 rounded-lg whitespace-nowrap shadow-md border border-white/10 backdrop-blur-sm pointer-events-none transition-all">
+                    {s.ubicacion}
+                  </div>
+                </div>
+              );
+            })}
         </div>
       </div>
 
@@ -103,6 +141,38 @@ export const MapInteractive = ({
               {level}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Minimalist Confirmation Modal Overlay */}
+      {teleportTarget && (
+        <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-auto animate-fade-in">
+          <div className="bg-slate-900/95 border border-white/10 rounded-2xl p-5 w-72 text-center shadow-2xl flex flex-col gap-4 animate-scale-up">
+            <div>
+              <h4 className="text-[10px] font-bold tracking-widest text-orange-500 uppercase">Confirmar Viaje</h4>
+              <p className="text-sm font-semibold text-white mt-1.5">{teleportTarget.ubicacion}</p>
+              <p className="text-[10px] text-white/50 mt-1">¿Deseas viajar a esta zona del campus?</p>
+            </div>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setTeleportTarget(null)}
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-semibold text-white hover:bg-white/10 transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onTeleport?.(teleportTarget.subId);
+                  setTeleportTarget(null);
+                }}
+                className="flex-1 rounded-lg bg-[linear-gradient(135deg,_#f97316_0%,_#ea580c_100%)] hover:bg-[linear-gradient(135deg,_#fb923c_0%,_#f97316_100%)] py-2 text-xs font-semibold text-white uppercase tracking-wider shadow-[0_4px_12px_rgba(234,88,12,0.3)] transition-all cursor-pointer"
+              >
+                Viajar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

@@ -5,8 +5,8 @@ export const AdminSidebar = ({
   tempPos,
   tempAngle,
   setTempAngle,
-  handleSavePosition,
-  loading,
+  handleAngleChangeEnd,
+  savingStatus,
 }) => {
   return (
     <aside className="flex w-[320px] flex-shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4">
@@ -44,18 +44,38 @@ export const AdminSidebar = ({
           step="1"
           value={tempAngle}
           onChange={(e) => setTempAngle(e.target.value)}
+          onMouseUp={(e) => handleAngleChangeEnd?.(e.target.value)}
+          onTouchEnd={(e) => handleAngleChangeEnd?.(e.target.value)}
           className="cursor-pointer"
         />
       </div>
 
-      <button
-        type="button"
-        onClick={handleSavePosition}
-        disabled={!selectedSubId || !tempPos || loading}
-        className="rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-40 cursor-pointer"
-      >
-        {loading ? 'Guardando...' : 'Guardar Posición'}
-      </button>
+      <div className="mt-2 flex items-center justify-center py-2 text-xs font-semibold rounded-full border border-slate-100 bg-slate-50/50">
+        {savingStatus === 'saving' && (
+          <span className="text-orange-500 flex items-center gap-1.5 animate-pulse">
+            <svg className="animate-spin h-3.5 w-3.5 text-orange-500" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Guardando posición...
+          </span>
+        )}
+        {savingStatus === 'saved' && (
+          <span className="text-green-600 flex items-center gap-1">
+            ✓ Guardado automáticamente
+          </span>
+        )}
+        {savingStatus === 'error' && (
+          <span className="text-red-500">
+            ⚠ Error al guardar
+          </span>
+        )}
+        {savingStatus === 'idle' && (
+          <span className="text-slate-400">
+            ✓ Todo guardado
+          </span>
+        )}
+      </div>
     </aside>
   );
 };

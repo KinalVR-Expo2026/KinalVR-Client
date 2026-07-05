@@ -100,7 +100,7 @@ export const SceneViewer = () => {
 
       {/* UI devuelta a su lugar correcto, fuera del 3D */}
       <MinimapWidget currentScene={scene} onOpen={() => setIsMapOpen(true)} />
-      {isMapOpen && <CampusMapPage onClose={() => setIsMapOpen(false)} currentScene={scene} />}
+      {isMapOpen && <CampusMapPage onClose={() => setIsMapOpen(false)} currentScene={scene} onNavigate={handleNavigationTransition} />}
 
       <a-scene
         webxr="optionalFeatures: hand-tracking, layers; referenceSpaceType: local-floor"

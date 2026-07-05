@@ -1,5 +1,5 @@
 import 'aframe';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTourStore } from '../store/useTourStore';
 
 const DISCO_FONDO_COLOR = "#0c0909";
@@ -10,6 +10,7 @@ const AREA_SELECCION_COLOR = "#4b6ccc";
 
 export const ConnectionMarker = ({ conexion, onNavigate }) => {
   const markerRef = useRef(null);
+  const [showLabel, setShowLabel] = useState(false);
   
   const isAdminMode = useTourStore((state) => state.isAdminMode);
   const selectedConnectionId = useTourStore((state) => state.selectedConnectionId);
@@ -85,13 +86,18 @@ export const ConnectionMarker = ({ conexion, onNavigate }) => {
           material="shader: flat; transparent: true; opacity: 0.95"
         ></a-triangle>
       </a-entity>
-      <a-text 
-        value={conexion.targetSubId.replace(/_/g, ' ')} 
-        align="center" 
-        position="0 0.45 0" 
-        color={TEXTO_ETIQUETA_COLOR}
-        scale="0.65 0.65 0.65"
-      ></a-text>
+
+      {/* El texto flotante se ha desactivado por completo a petición del usuario
+      {(showLabel || isSelected) && (
+        <a-text 
+          value={conexion.targetSubId.replace(/_/g, ' ')} 
+          align="center" 
+          position="0 0.45 0" 
+          color={TEXTO_ETIQUETA_COLOR}
+          scale="0.65 0.65 0.65"
+        ></a-text>
+      )}
+      */}
 
       {isSelected && (
         <a-entity

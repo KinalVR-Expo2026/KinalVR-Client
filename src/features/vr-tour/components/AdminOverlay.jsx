@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTourStore } from '../store/useTourStore';
-import { updateEvent as apiUpdateEvent, getScenesList, createScene } from '../../../shared/api/admin';
+import { updateEvent as apiUpdateEvent, getScenesList, createScene, updateScene } from '../../../shared/api/admin';
 import { parseCoordString, clampCoord, POSITION_BOUND, ROTATION_BOUND } from '../../../shared/utils/coordinateUtils';
 import { SceneInfoModal } from './SceneInfoModal';
 import { CreateSceneModal } from './CreateSceneModal';
@@ -43,6 +43,47 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
   const [newSceneData, setNewSceneData] = useState({ subId: '', ubicacion: '', nivel: 'PRIMER NIVEL', imagen: null });
   const [isSubmittingScene, setIsSubmittingScene] = useState(false);
   const [sceneSubmitError, setSceneSubmitError] = useState('');
+
+  const [currentAngle, setCurrentAngle] = useState(0);
+  const [isSavingAngle, setIsSavingAngle] = useState(false);
+  const [angleSaveMessage, setAngleSaveMessage] = useState('');
+  const [angleSaveType, setAngleSaveType] = useState('');
+
+  useEffect(() => {
+    if (scene) {
+      setCurrentAngle(scene.coordinacionAngulo || 0);
+    }
+  }, [scene]);
+
+  const handleAngleChange = (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (isNaN(val)) return;
+    setCurrentAngle(val);
+    if (scene) {
+      useTourStore.getState().updateScenePositionInCache(scene.subId, scene.posicion, val);
+    }
+  };
+
+  const handleSaveAngle = async (angleVal) => {
+    if (!scene) return;
+    setIsSavingAngle(true);
+    setAngleSaveMessage('Guardando...');
+    try {
+      const targetAngle = parseInt(angleVal, 10);
+      await updateScene(scene._id, { coordinacionAngulo: targetAngle });
+      useTourStore.getState().updateScenePositionInCache(scene.subId, scene.posicion, targetAngle);
+      setAngleSaveType('success');
+      setAngleSaveMessage('Guardado');
+      setTimeout(() => setAngleSaveMessage(''), 2500);
+    } catch (err) {
+      console.error(err);
+      setAngleSaveType('error');
+      setAngleSaveMessage('Error al guardar');
+      setTimeout(() => setAngleSaveMessage(''), 3000);
+    } finally {
+      setIsSavingAngle(false);
+    }
+  };
 
   const handleEventCreated = (createdEvent) => {
     addEventToSceneCache(scene.subId, createdEvent);
@@ -322,12 +363,47 @@ export const AdminOverlay = ({ scene, events, updateEventCoords, isFullscreen, t
             </button>
           </div>
         )}
+
+        {isAdminMode && scene && (
+          <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-md p-3.5 shadow-lg w-72 mt-1 animate-fade-in pointer-events-auto">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-bold tracking-wider text-orange-500 uppercase">Desfase de Escena</span>
+              <span className="text-[11px] font-mono font-bold text-white bg-slate-900/80 px-1.5 py-0.5 rounded border border-white/5">{currentAngle}°</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-white/40">-180°</span>
+              <input
+                type="range"
+                min="-180"
+                max="180"
+                step="1"
+                value={currentAngle}
+                onChange={handleAngleChange}
+                onMouseUp={(e) => handleSaveAngle(e.target.value)}
+                onTouchEnd={(e) => handleSaveAngle(e.target.value)}
+                className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-orange-500"
+              />
+              <span className="text-[9px] text-white/40">180°</span>
+            </div>
+            <div className="flex justify-between items-center gap-2 mt-0.5">
+              {angleSaveMessage ? (
+                <span className={`text-[10px] font-semibold ${angleSaveType === 'success' ? 'text-green-400' : 'text-red-400'} animate-pulse`}>
+                  {angleSaveMessage}
+                </span>
+              ) : (
+                <span className="text-[9px] text-white/30 italic">Se guarda al soltar</span>
+              )}
+            </div>
+          </div>
+        )}
+        {/* 
         <button type="button" onClick={() => setAdminMode(!isAdminMode)} className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-medium tracking-[1.5px] uppercase backdrop-blur-md transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)] cursor-pointer ${isAdminMode ? 'border-orange-500/50 bg-orange-950/40 text-orange-400 font-semibold shadow-[0_0_15px_rgba(249,115,22,0.2)]' : 'border-white/10 bg-slate-950/45 text-[#e0e4eb] hover:border-white/30 hover:bg-white/5'}`}>
           <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isAdminMode ? 'rotate-12 scale-110' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             {isAdminMode ? <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5V12a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 12v8.25a1.5 1.5 0 001.5 1.5z" /> : <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />}
           </svg>
           {isAdminMode ? 'Salir Admin' : 'Modo Admin'}
         </button>
+        */}
         <button type="button" onClick={() => toggleFullscreen().catch(() => {})} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/45 text-[#e0e4eb] shadow-[0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all duration-300 cursor-pointer hover:border-white/30 hover:bg-white/5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d={isFullscreen ? 'M9 9H5V5m10 0h4v4M5 15h4v4m10-4h-4v4' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3M8 21H5a2 2 0 01-2-2v-3m18 0v3a2 2 0 01-2 2h-3'} />
