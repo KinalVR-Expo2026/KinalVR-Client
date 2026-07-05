@@ -150,7 +150,65 @@ export const registerVRComponents = () => {
     });
   }
 
-  // 5. Ocultar la línea del laser fuera de VR
+  // 5. Panel que siempre rota para mirar al usuario (paneles de evento y mapa en VR)
+  if (!AFRAME.components['billboard']) {
+    AFRAME.registerComponent('billboard', {
+      tick: function () {
+        const camera = this.el.sceneEl.camera;
+        if (!camera) return;
+
+        const camWPos = new THREE.Vector3();
+        camera.getWorldPosition(camWPos);
+
+        const panelWPos = new THREE.Vector3();
+        this.el.object3D.getWorldPosition(panelWPos);
+
+        const dx = camWPos.x - panelWPos.x;
+        const dz = camWPos.z - panelWPos.z;
+        this.el.object3D.rotation.y = Math.atan2(dx, dz);
+      }
+    });
+  }
+
+  // 6. Teñir el modelo del mando con un color de marca. Los mandos Touch son
+  // plástico oscuro, así que un tinte por multiplicación (material.color) no se
+  // nota; se usa `emissive` (brillo propio) para que el color sí resalte. Se
+  // aplica cuando el modelo del control termina de cargar (controllermodelready /
+  // model-loaded), recorriendo sus mallas.
+  if (!AFRAME.components['controller-tint']) {
+    AFRAME.registerComponent('controller-tint', {
+      schema: {
+        color: { type: 'color', default: '#ffffff' },
+        intensity: { type: 'number', default: 0.6 }
+      },
+      init: function () {
+        this.applyTint = () => {
+          const root = this.el.getObject3D('mesh') || this.el.object3D;
+          if (!root) return;
+          const col = new THREE.Color(this.data.color);
+          root.traverse((node) => {
+            if (!node.isMesh || !node.material) return;
+            const mats = Array.isArray(node.material) ? node.material : [node.material];
+            mats.forEach((m) => {
+              if (m.emissive) {
+                m.emissive.copy(col);
+                m.emissiveIntensity = this.data.intensity;
+                m.needsUpdate = true;
+              }
+            });
+          });
+        };
+        this.el.addEventListener('controllermodelready', this.applyTint);
+        this.el.addEventListener('model-loaded', this.applyTint);
+      },
+      remove: function () {
+        this.el.removeEventListener('controllermodelready', this.applyTint);
+        this.el.removeEventListener('model-loaded', this.applyTint);
+      }
+    });
+  }
+
+  // 7. Ocultar la línea del laser fuera de VR
   if (!AFRAME.components['vr-only-line']) {
     AFRAME.registerComponent('vr-only-line', {
       schema: {

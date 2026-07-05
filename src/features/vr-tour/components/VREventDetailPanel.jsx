@@ -1,30 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-
-if (typeof window !== 'undefined' && window.AFRAME && !window.AFRAME.components['billboard']) {
-  window.AFRAME.registerComponent('billboard', {
-    tick: function () {
-      const camera = this.el.sceneEl.camera;
-      if (!camera) return;
-
-      const THREE = window.THREE || window.AFRAME.THREE;
-      
-      const camWPos = new THREE.Vector3();
-      camera.getWorldPosition(camWPos);
-
-      const panelWPos = new THREE.Vector3();
-      this.el.object3D.getWorldPosition(panelWPos);
-
-      const dx = camWPos.x - panelWPos.x;
-      const dz = camWPos.z - panelWPos.z;
-      this.el.object3D.rotation.y = Math.atan2(dx, dz);
-    }
-  });
-}
+import { VRBackdrop } from './VRBackdrop';
 
 export const VREventDetailPanel = ({ event, onClose }) => {
   const panelRef = useRef(null);
   const closeBtnRef = useRef(null);
-  const backdropRef = useRef(null);
   const [position, setPosition] = useState('0 1.6 -2.5');
   const [imgDims, setImgDims] = useState({ width: 1.0, height: 0.75 });
 
@@ -59,30 +38,22 @@ export const VREventDetailPanel = ({ event, onClose }) => {
     return () => { img.onload = null; img.onerror = null; };
   }, [event?.urlImagen]);
 
-  // Close button + backdrop click + raycaster refresh
+  // Close button + raycaster refresh (el cierre "tocando afuera" lo maneja VRBackdrop)
   useEffect(() => {
     const closeBtn = closeBtnRef.current;
-    const backdrop = backdropRef.current;
 
     const handleClose = (e) => {
       if (e && e.stopPropagation) e.stopPropagation();
       if (typeof onClose === 'function') onClose();
     };
 
-    // Attach listeners to close button
     if (closeBtn) {
       closeBtn.addEventListener('click', handleClose);
       closeBtn.addEventListener('mousedown', handleClose);
     }
 
-    // Attach listeners to backdrop (click outside to close)
-    if (backdrop) {
-      backdrop.addEventListener('click', handleClose);
-      backdrop.addEventListener('mousedown', handleClose);
-    }
-
     // Refresh raycasters multiple times with staggered delays
-    // so the X and backdrop are immediately pickable.
+    // so the X is immediately pickable.
     const refreshRaycasters = () => {
       document.querySelectorAll('[raycaster]').forEach(rc => {
         if (rc.components && rc.components.raycaster) {
@@ -101,10 +72,6 @@ export const VREventDetailPanel = ({ event, onClose }) => {
       if (closeBtn) {
         closeBtn.removeEventListener('click', handleClose);
         closeBtn.removeEventListener('mousedown', handleClose);
-      }
-      if (backdrop) {
-        backdrop.removeEventListener('click', handleClose);
-        backdrop.removeEventListener('mousedown', handleClose);
       }
     };
   }, [onClose]);
@@ -210,7 +177,7 @@ export const VREventDetailPanel = ({ event, onClose }) => {
       <a-plane width={PW} height="0.004" color="#f97316" opacity="0.25" position={`0 ${-PH/2 + 0.002} 0.003`} material="shader: flat; transparent: true; side: double" />
       <a-text value="Apunta a la X para cerrar o cualquier lugar fuera del cuadro" align="center" color="#64748b" width="0.9" position={`0 ${-PH/2 + 0.035} 0.005`} side="double" />
       
-      <a-plane ref={backdropRef} className="clickable" width="8" height="6" color="#000" opacity="0" material="shader: flat; transparent: true; side: double" position="0 0 -0.02" />
+      <VRBackdrop onClose={onClose} />
     </a-entity>
   );
 };

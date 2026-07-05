@@ -30,10 +30,11 @@ export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
         data-offset={sceneOffset}
       ></a-entity>
 
-      {/* Mano Izquierda */}
+      {/* Mano Izquierda — naranja de marca (mando por emissive, manos por modelColor) */}
       <a-entity
-        hand-tracking-controls="hand: left"
+        hand-tracking-controls="hand: left; modelColor: #f97316"
         laser-controls="hand: left"
+        controller-tint="color: #f97316"
         raycaster="objects: .clickable; far: 50; showLine: true"
         vr-only-line="color: #f97316; opacity: 0.7"
         thumbstick-turning="turnAngle: 45"
@@ -53,12 +54,13 @@ export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
         ></a-entity>
       </a-entity>
 
-      {/* Mano Derecha (además apunta al minimapa de muñeca: .vrmap-target) */}
+      {/* Mano Derecha — azul de marca (además apunta al minimapa de muñeca: .vrmap-target) */}
       <a-entity
-        hand-tracking-controls="hand: right"
+        hand-tracking-controls="hand: right; modelColor: #4b6ccc"
         laser-controls="hand: right"
+        controller-tint="color: #4b6ccc"
         raycaster="objects: .clickable, .vrmap-target; far: 50; showLine: true"
-        vr-only-line="color: #f97316; opacity: 0.7"
+        vr-only-line="color: #4b6ccc; opacity: 0.7"
         thumbstick-turning="turnAngle: 45"
         hand-pinch-click
         hand-joystick-turn="speed: 1.5; deadzone: 0.02"

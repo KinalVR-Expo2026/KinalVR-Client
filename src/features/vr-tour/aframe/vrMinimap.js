@@ -46,8 +46,17 @@ export const registerVRMinimap = () => {
       const radius = this.data.radius;
       const group = new THREE.Group();
 
-      // Disco del plano (radar).
-      this.planoMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      // Respaldo del disco: el plano ahora es transparente (webp con alfa), así que
+      // sin este fondo se verían las líneas del plano flotando sobre la escena.
+      const backing = new THREE.Mesh(
+        new THREE.CircleGeometry(radius, 48),
+        new THREE.MeshBasicMaterial({ color: 0x0c0f1e, transparent: true, opacity: 0.82 })
+      );
+      backing.position.z = -0.0005;
+      group.add(backing);
+
+      // Disco del plano (radar). transparent para respetar el alfa del webp.
+      this.planoMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
       const plano = new THREE.Mesh(new THREE.CircleGeometry(radius, 48), this.planoMaterial);
       group.add(plano);
 

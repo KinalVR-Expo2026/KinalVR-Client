@@ -85,6 +85,10 @@ export const registerVRMapPlano = () => {
       tex.repeat.set(1, 1);
       tex.offset.set(0, 0);
       mesh.material.map = tex;
+      // El plano webp trae alfa: mostrarlo transparente (el panel atenuado detrás
+      // hace de fondo). alphaTest recorta el borde para que no quede un halo.
+      mesh.material.transparent = true;
+      mesh.material.alphaTest = 0.01;
       mesh.material.needsUpdate = true;
       this.tex = tex;
       this.lastAspect = 0; // forzar re-dimensionado con el nuevo aspecto

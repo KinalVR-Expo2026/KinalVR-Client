@@ -1,5 +1,5 @@
 import 'aframe';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTourNavigation } from '../hooks/useTourNavigation';
 import { ConnectionMarker } from './ConnectionMarker';
 import { EventMarker } from './EventMarker';
@@ -26,25 +26,43 @@ export const SceneViewer = () => {
   const { events, eventsLoading, eventsError, activeSkyAssetId, allAssetsToLoad, updateEventCoords } = useSceneData(scene);
   const { isFullscreen, toggleFullscreen, enableHandTracking, isInVR } = useXR(wrapperRef, sceneRef, scene);
 
-  // Refrescar raycasters de A-Frame una sola vez, tras cargar el escenario y sus
-  // eventos (antes eran dos useEffect separados con temporizadores propios que
-  // disparaban refreshObjects() por duplicado en cada carga de escena).
+  // Reconstruye la lista de objetos apuntables de cada raycaster de A-Frame
+  // (.clickable / .vrmap-target). Una sola pasada.
+  const refreshRaycasters = useCallback(() => {
+    document.querySelectorAll('[raycaster]').forEach((el) => {
+      try {
+        el.components?.raycaster?.refreshObjects?.();
+      } catch (e) {
+        console.warn('A-Frame raycaster refresh warning:', e);
+      }
+    });
+  }, []);
+
+  // Escalonado en varios instantes: las entidades (marcadores, minimapa de muñeca,
+  // controllers al entrar a VR) no siempre están listas en un único momento. Un
+  // refresh de un solo disparo perdía la carrera y el minimapa de muñeca a veces
+  // no quedaba apuntable hasta cambiar de escena (bug de apertura intermitente).
+  const scheduleStaggeredRefresh = useCallback(() => {
+    const timers = [150, 500, 1000, 1800].map((ms) => setTimeout(refreshRaycasters, ms));
+    return () => timers.forEach(clearTimeout);
+  }, [refreshRaycasters]);
+
+  // Tras cargar la escena y sus eventos.
   useEffect(() => {
-    if (scene) {
-      const timeout = setTimeout(() => {
-        document.querySelectorAll('[raycaster]').forEach(el => {
-          try {
-            if (el.components?.raycaster?.refreshObjects) {
-              el.components.raycaster.refreshObjects();
-            }
-          } catch (e) {
-            console.warn("A-Frame raycaster refresh warning:", e);
-          }
-        });
-      }, 150);
-      return () => clearTimeout(timeout);
-    }
-  }, [scene]);
+    if (!scene) return;
+    return scheduleStaggeredRefresh();
+  }, [scene, events, scheduleStaggeredRefresh]);
+
+  // Al entrar a VR se inicializan los raycasters de las manos y deben recoger el
+  // minimapa de muñeca (.vrmap-target); sin esto el primer intento de abrir el
+  // mapa a veces no registraba el clic.
+  useEffect(() => {
+    const sceneEl = sceneRef.current;
+    if (!sceneEl) return;
+    const onEnterVR = () => scheduleStaggeredRefresh();
+    sceneEl.addEventListener('enter-vr', onEnterVR);
+    return () => sceneEl.removeEventListener('enter-vr', onEnterVR);
+  }, [scheduleStaggeredRefresh]);
 
   // El minimapa 3D de muñeca (vr-minimap) emite este evento al clickearse en VR.
   useEffect(() => {
@@ -52,22 +70,6 @@ export const SceneViewer = () => {
     window.addEventListener('vr-minimap-open', open);
     return () => window.removeEventListener('vr-minimap-open', open);
   }, []);
-
-  useEffect(() => {
-    if (events.length === 0) return;
-    const timeout = setTimeout(() => {
-      document.querySelectorAll('[raycaster]').forEach(el => {
-        try {
-          if (el.components?.raycaster?.refreshObjects) {
-            el.components.raycaster.refreshObjects();
-          }
-        } catch (e) {
-          console.warn("A-Frame raycaster refresh warning:", e);
-        }
-      });
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [scene, events]);
 
   if (loading && !isTransitioning) {
     return (
