@@ -156,7 +156,14 @@ export const SceneViewer = () => {
         )}
 
         {isInVR && isVRMapOpen && (
-          <VRCampusMap cameraRef={cameraRef} onClose={() => setIsVRMapOpen(false)} />
+          <VRCampusMap
+            cameraRef={cameraRef}
+            onClose={() => setIsVRMapOpen(false)}
+            onTeleport={(subId) => {
+              setIsVRMapOpen(false);
+              handleNavigationTransition(subId);
+            }}
+          />
         )}
       </a-scene>
 

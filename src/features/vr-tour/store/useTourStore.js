@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSceneBySubId, updateScene } from '../../../shared/api/admin';
+import { getScenes } from '../../../shared/api/scenes';
 import { getHighResTextureUrl, getLowResTextureUrl, preloadImage } from '../../../shared/utils/imageUtils';
 
 const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
@@ -20,6 +21,10 @@ const addPreloadedImages = (current, ...urls) => {
 export const useTourStore = create((set, get) => ({
   activeSubId: 'entrada',
   scenesCache: {},
+  // Índice global de escenas (todas, no solo las visitadas) — lo usan los puntos
+  // de teletransporte del mapa VR. Se rellena bajo demanda con fetchScenesIndex y
+  // se cachea para no re-pegarle al endpoint /scenes cada vez que se abre el mapa.
+  scenesIndex: null,
   isAdminMode: false,
   selectedConnectionId: null,
   selectedEventId: null,
@@ -30,6 +35,23 @@ export const useTourStore = create((set, get) => ({
   setAdminMode: (isAdmin) => set({ isAdminMode: isAdmin, selectedConnectionId: null, selectedEventId: null }),
   setSelectedConnectionId: (id) => set({ selectedConnectionId: id ? id.trim() : id, selectedEventId: null }),
   setSelectedEventId: (id) => set({ selectedEventId: id ? id.trim() : id, selectedConnectionId: null }),
+
+  // Devuelve el índice global de escenas (cacheado). Primera llamada: pega a
+  // GET /scenes?limite=1000; siguientes: devuelve la caché. En error: [] (los
+  // dots simplemente no aparecen, sin romper el mapa).
+  fetchScenesIndex: async () => {
+    const existing = get().scenesIndex;
+    if (Array.isArray(existing)) return existing;
+    try {
+      const scenes = await getScenes();
+      const list = Array.isArray(scenes) ? scenes : [];
+      set({ scenesIndex: list });
+      return list;
+    } catch (error) {
+      console.warn('No se pudo cargar el índice de escenas para el mapa VR:', error);
+      return [];
+    }
+  },
 
   preloadInitialScene: async (subId) => {
     const { fetchSceneData, preloadAdjacentScenes } = get();

@@ -65,7 +65,7 @@ const CATCHER_CY = (CATCHER_Y_MIN + CATCHER_Y_MAX) / 2;
 const CATCHER_W = CATCHER_X_MAX - CATCHER_X_MIN;
 const CATCHER_H = CATCHER_Y_MAX - CATCHER_Y_MIN;
 
-export const VRCampusMap = ({ cameraRef, onClose }) => {
+export const VRCampusMap = ({ cameraRef, onClose, onTeleport }) => {
   const rootRef = useRef(null);
   const tiltGroupRef = useRef(null);
   const planoRef = useRef(null);
@@ -108,6 +108,20 @@ export const VRCampusMap = ({ cameraRef, onClose }) => {
     const euler = new THREE.Euler().setFromQuaternion(quat, 'YXZ');
     root.object3D.rotation.set(0, euler.y, 0);
   }, [cameraRef]);
+
+  // Teletransporte: vr-map-plano emite `map-teleport` en el a-plane host cuando
+  // el usuario toca un dot (hit-test THREE, ver mapTeleportDots). Patrón del
+  // proyecto: ref + addEventListener (ConnectionMarker).
+  useEffect(() => {
+    const el = planoRef.current;
+    if (!el) return;
+    const handle = (e) => {
+      const subId = e.detail?.subId;
+      if (subId) onTeleport?.(subId);
+    };
+    el.addEventListener('map-teleport', handle);
+    return () => el.removeEventListener('map-teleport', handle);
+  }, [onTeleport]);
 
   return (
     <a-entity ref={rootRef} billboard>

@@ -3,12 +3,17 @@ import { computeMinimapDegrees } from './registerVRComponents';
 import { buildArrowGeometry } from './arrowGeometry';
 import { useTourStore } from '../store/useTourStore';
 import { BACKGROUND_CALIBRATION, LEVEL_TO_NUM } from '../constants/campusMap';
+import { buildDots, hitTestDot, disposeDots } from './mapTeleportDots';
 
 // --- T7: zoom doble-tap + arrastre con grip (constantes calibrables) ---
 const ZOOM_SCALE = 2.5;        // factor de zoom-in
 const DOUBLE_TAP_MS = 400;     // ventana temporal para el doble-tap
 const DOUBLE_TAP_UV_DIST = 0.08; // distancia UV máx. entre los dos taps
 const DEDUPE_MS = 50;          // ignora clicks duplicados del mismo gesto (hand-pinch)
+
+// --- T8: puntos de teletransporte ---
+const DOTS_REBUILD_MS = 1000;  // refresco del filtro/dibujo de dots (~1 Hz, barato)
+const DOT_HIT_RADIUS = 0.035;  // radio de acierto del click sobre un dot (mundo)
 
 // Componente del plano grande del mapa del campus en VR (contraparte 3D del tab
 // "Mapa" de CampusMapPage / MapInteractive). Replica el "overlay" de escritorio:
@@ -146,6 +151,14 @@ export const registerVRMapPlano = () => {
       this.onGripUp = this.onGripUp.bind(this);
       this.gripHands = [];
       this.bindGripHands();
+
+      // --- T8: dots de teletransporte ---
+      this.dotsGroupRef = { current: null }; // grupo THREE de dots (hijo del overlayGroup)
+      this.dots = [];                        // descriptores { subId, x, y } para hit-test
+      this.dotsLevel = null;                 // nivel del último rebuild
+      this.lastDotsBuild = 0;
+      // Pre-cargar el índice global de escenas (cacheado en el store).
+      useTourStore.getState().fetchScenesIndex();
     },
 
     // Enlaza gripdown/gripup a las dos manos. Idempotente: solo enlaza las manos
@@ -323,9 +336,32 @@ export const registerVRMapPlano = () => {
       }
     },
 
-    // Placeholder T8: se sobrescribe la lógica en applyOverlayTexture/tick de T8.
-    hitTestTeleport: function () {
-      return null;
+    // --- T8: dots de teletransporte ---
+
+    // Reconstruye los dots del nivel activo leyendo scenesIndex del store.
+    // Throttleado en el tick (~1 Hz). Los dots viven en el overlayGroup, así que
+    // heredan el transform del nivel + zoom automáticamente.
+    rebuildDots: function () {
+      if (!this.width || !this.height) return; // aún sin dimensionar
+      const state = useTourStore.getState();
+      const scenes = state.scenesIndex;
+      if (!Array.isArray(scenes)) return; // índice aún no cargado
+      const activeSubId = state.activeSubId;
+
+      this.dots = buildDots(
+        this.THREE, this.overlayGroup, this.dotsGroupRef,
+        scenes, this.data.level, activeSubId,
+        this.width, this.height
+      );
+      this.dotsLevel = this.data.level;
+    },
+
+    // Hit-test de teletransporte: pasa el punto tocado (mundo) al espacio local
+    // del overlayGroup y busca un dot dentro de DOT_HIT_RADIUS. Devuelve subId o null.
+    hitTestTeleport: function (worldPoint) {
+      if (!this.dots || this.dots.length === 0) return null;
+      const local = this.overlayGroup.worldToLocal(worldPoint.clone());
+      return hitTestDot(local, this.dots, DOT_HIT_RADIUS);
     },
 
     // --- T7: arrastre con grip ---
@@ -375,17 +411,19 @@ export const registerVRMapPlano = () => {
       this.dragPrevPoint = local;
     },
 
-    tick: function () {
+    tick: function (time) {
       const aspect = this.baseTex?.userData?.aspect || this.overlayTex?.userData?.aspect || 1;
       const width = this.data.height * aspect;
       const height = this.data.height;
 
+      let relayout = false;
       if (aspect !== this.lastAspect) {
         this.lastAspect = aspect;
         // La geometría del a-plane host (superficie de raycast) sigue el mismo W×H.
         this.el.setAttribute('width', width);
         this.el.setAttribute('height', height);
         this.layout(width, height);
+        relayout = true;
       }
 
       // Grip aún sin enlazar (manos que aparecieron tras el init) → reintentar.
@@ -393,6 +431,14 @@ export const registerVRMapPlano = () => {
 
       // Arrastre con grip (solo con zoom).
       if (this.dragHand && this.isZoomed) this.updateDrag();
+
+      // Dots de teletransporte: rebuild al cambiar de nivel/dimensión o ~1 Hz
+      // (por si el índice de escenas termina de cargar tras el init).
+      if (relayout || this.dotsLevel !== this.data.level ||
+          (time - this.lastDotsBuild) > DOTS_REBUILD_MS) {
+        this.lastDotsBuild = time;
+        this.rebuildDots();
+      }
 
       // Flecha del usuario: solo si el nivel mostrado es el de la escena actual.
       const state = useTourStore.getState();
@@ -417,6 +463,9 @@ export const registerVRMapPlano = () => {
         hand.removeEventListener('gripup', this.onGripUp);
       });
       this.gripHands = [];
+
+      // Dots de teletransporte (T8).
+      disposeDots(this.dotsGroupRef);
 
       this.el.removeObject3D('zoom-group');
 
