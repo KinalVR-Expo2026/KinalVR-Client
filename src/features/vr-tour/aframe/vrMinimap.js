@@ -69,15 +69,15 @@ export const registerVRMinimap = () => {
       group.add(ring);
 
       // Flecha: triángulo blanco (borde) + triángulo azul encima (relleno),
-      // replicando el diseño del MinimapArrow.
+      // replicando el diseño del MinimapArrow. Factores calibrables en casco.
       const arrow = new THREE.Group();
       const arrowBack = new THREE.Mesh(
-        buildArrowGeometry(THREE, (radius * 1.7) / 100),
+        buildArrowGeometry(THREE, (radius * 1.0) / 100),
         new THREE.MeshBasicMaterial({ color: 0xffffff })
       );
       arrowBack.position.z = 0.001;
       const arrowFront = new THREE.Mesh(
-        buildArrowGeometry(THREE, (radius * 1.35) / 100),
+        buildArrowGeometry(THREE, (radius * 0.8) / 100),
         new THREE.MeshBasicMaterial({ color: 0x20346b })
       );
       arrowFront.position.z = 0.0015;

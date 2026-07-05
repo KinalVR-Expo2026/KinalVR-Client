@@ -46,12 +46,13 @@ export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
             (`vrmap-target`) para que SOLO la mano derecha lo apunte/clickee — así
             la propia mano izquierda que lo porta no se auto-intersecta (evita
             desactivar su joystick de giro ni abrir el mapa sin querer).
-            Posición/rotación sobre la muñeca a calibrar en casco. */}
+            Posición/rotación: a la izquierda del mando y un poco arriba, calibrable
+            en casco. */}
         <a-entity
           className="vrmap-target"
           vr-minimap
-          position="0 0.04 0.06"
-          rotation="-50 0 0"
+          position="-0.05 0.08 0.02"
+          rotation="-30 0 0"
         ></a-entity>
       </a-entity>
 
