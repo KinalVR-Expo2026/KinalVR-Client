@@ -26,10 +26,13 @@ const DOT_HIT_RADIUS = 0.035;  // radio de acierto del click sobre un dot (mundo
 //                 superficie de raycast del zoom/arrastre y del hit-test de dots)
 //     └─ zoomGroup (THREE.Group)                     ← escala/traslada con zoom
 //          ├─ baseMesh  (W×H, textura nivel 1 SIEMPRE)
-//          └─ overlayGroup (THREE.Group)             ← transform del nivel activo
-//               ├─ overlayMesh (W×H, textura del nivel activo)
-//               ├─ user-arrow  (flecha del usuario)
-//               └─ dots        (T8, puntos de teletransporte)
+//          ├─ overlayGroup (THREE.Group)             ← transform del nivel activo
+//          │    └─ overlayMesh (W×H, textura del nivel activo)
+//          ├─ user-arrow  (flecha del usuario, HERMANA de overlayGroup: igual que
+//          │               en escritorio, su posición vive en "espacio base" y
+//          │               solo hereda el zoom/arrastre del zoomGroup, no el
+//          │               transform propio del overlay del nivel activo)
+//          └─ dots        (T8, puntos de teletransporte, mismo espacio base)
 //
 // El mesh 'mesh' propio del a-plane host se deja TRANSPARENTE (opacity 0 vía el
 // material del JSX) — conserva su geometría plana para el raycast pero no pinta.
@@ -105,7 +108,8 @@ export const registerVRMapPlano = () => {
       this.baseMesh.position.z = 0;
       this.zoomGroup.add(this.baseMesh);
 
-      // overlayGroup: contiene el plano del nivel activo + flecha + dots (T8).
+      // overlayGroup: contiene SOLO el plano del nivel activo (transformado por
+      // BACKGROUND_CALIBRATION). Flecha y dots (T8) NO van aquí — ver más abajo.
       this.overlayGroup = new THREE.Group();
       this.overlayMaterial = new THREE.MeshBasicMaterial({
         color: 0xffffff, transparent: true, alphaTest: 0.01, side: THREE.DoubleSide
@@ -114,11 +118,14 @@ export const registerVRMapPlano = () => {
       this.overlayMesh.position.z = 0.001;
       this.overlayGroup.add(this.overlayMesh);
 
-      // Flecha del usuario (hija del overlayGroup → hereda transform del nivel + zoom).
-      this.arrow = buildArrow(THREE, this.data.height * 0.12);
-      this.overlayGroup.add(this.arrow);
-
       this.zoomGroup.add(this.overlayGroup);
+
+      // Flecha del usuario: HERMANA de overlayGroup (hija directa del zoomGroup),
+      // no hija del overlay — su posición ya está en espacio base (ver tick()),
+      // así que solo debe heredar el zoom/arrastre, no el transform del overlay.
+      this.arrow = buildArrow(THREE, this.data.height * 0.12);
+      this.arrow.position.z = 0.003; // por encima del base (z=0) y del overlay (z=0.002)
+      this.zoomGroup.add(this.arrow);
       this.el.setObject3D('zoom-group', this.zoomGroup);
 
       // Textura base (nivel 1): vive SIEMPRE, no se libera al cambiar de nivel.
@@ -153,7 +160,7 @@ export const registerVRMapPlano = () => {
       this.bindGripHands();
 
       // --- T8: dots de teletransporte ---
-      this.dotsGroupRef = { current: null }; // grupo THREE de dots (hijo del overlayGroup)
+      this.dotsGroupRef = { current: null }; // grupo THREE de dots (hijo del zoomGroup)
       this.dots = [];                        // descriptores { subId, x, y } para hit-test
       this.dotsLevel = null;                 // nivel del último rebuild
       this.lastDotsBuild = 0;
@@ -230,8 +237,9 @@ export const registerVRMapPlano = () => {
 
       const level = this.data.level;
       if (level === 1) {
-        // Base a color pleno; overlay oculto; overlayGroup en identidad (coincide
-        // con la base) para que flecha y dots vivan en el mismo espacio.
+        // Base a color pleno; overlay oculto. overlayGroup en identidad (no afecta
+        // a flecha/dots: ahora viven en el zoomGroup, en espacio base, no dentro
+        // del overlay).
         this.baseMaterial.color.setHex(0xffffff);
         this.baseMaterial.opacity = 1;
         this.overlayMesh.visible = false;
@@ -339,8 +347,9 @@ export const registerVRMapPlano = () => {
     // --- T8: dots de teletransporte ---
 
     // Reconstruye los dots del nivel activo leyendo scenesIndex del store.
-    // Throttleado en el tick (~1 Hz). Los dots viven en el overlayGroup, así que
-    // heredan el transform del nivel + zoom automáticamente.
+    // Throttleado en el tick (~1 Hz). Los dots viven en el zoomGroup (espacio
+    // base, HERMANOS de overlayGroup), así que heredan solo el zoom automáticamente,
+    // no el transform propio del overlay del nivel activo.
     rebuildDots: function () {
       if (!this.width || !this.height) return; // aún sin dimensionar
       const state = useTourStore.getState();
@@ -349,7 +358,7 @@ export const registerVRMapPlano = () => {
       const activeSubId = state.activeSubId;
 
       this.dots = buildDots(
-        this.THREE, this.overlayGroup, this.dotsGroupRef,
+        this.THREE, this.zoomGroup, this.dotsGroupRef,
         scenes, this.data.level, activeSubId,
         this.width, this.height
       );
@@ -357,10 +366,11 @@ export const registerVRMapPlano = () => {
     },
 
     // Hit-test de teletransporte: pasa el punto tocado (mundo) al espacio local
-    // del overlayGroup y busca un dot dentro de DOT_HIT_RADIUS. Devuelve subId o null.
+    // del zoomGroup (mismo espacio donde ahora viven los dots) y busca un dot
+    // dentro de DOT_HIT_RADIUS. Devuelve subId o null.
     hitTestTeleport: function (worldPoint) {
       if (!this.dots || this.dots.length === 0) return null;
-      const local = this.overlayGroup.worldToLocal(worldPoint.clone());
+      const local = this.zoomGroup.worldToLocal(worldPoint.clone());
       return hitTestDot(local, this.dots, DOT_HIT_RADIUS);
     },
 
@@ -450,7 +460,7 @@ export const registerVRMapPlano = () => {
       if (onThisLevel) {
         const px = (scene.posicion[0] || 0) / 100;
         const py = (scene.posicion[1] || 0) / 100;
-        this.arrow.position.set((px - 0.5) * width, (0.5 - py) * height, 0.01);
+        this.arrow.position.set((px - 0.5) * width, (0.5 - py) * height, 0.003);
         this.arrow.rotation.z = -this.THREE.MathUtils.degToRad(this.frozenHeadingDeg);
       }
     },

@@ -1,13 +1,15 @@
 import { LEVEL_TO_NUM } from '../constants/campusMap';
 
 // Puntos de teletransporte del mapa grande en VR (T8). Son meshes THREE (círculo
-// naranja + anillo blanco) que vr-map-plano dibuja DENTRO del overlayGroup, así
-// heredan el transform del nivel activo (BACKGROUND_CALIBRATION) y el del zoom.
+// naranja + anillo blanco) que vr-map-plano dibuja DENTRO del zoomGroup (HERMANOS
+// de overlayGroup, no hijos) — igual que en escritorio, sus coordenadas ya están
+// en "espacio base" y solo deben heredar el zoom/arrastre, NO el transform propio
+// del overlay del nivel activo (BACKGROUND_CALIBRATION).
 //
 // Los meshes THREE no son raycasteables por el sistema `.clickable` de A-Frame
 // (que opera sobre entidades). Por eso el click se resuelve por hit-test manual:
 // vr-map-plano, en el listener de click del a-plane host, pasa el punto tocado a
-// coords locales del overlayGroup y llama a hitTestDot(). El mismo espacio en el
+// coords locales del zoomGroup y llama a hitTestDot(). El mismo espacio en el
 // que viven los dots, así que la comparación es directa.
 //
 // El filtro es EXACTO al del mapa de escritorio (MapInteractive): mismo nivel,
@@ -19,16 +21,17 @@ const DOT_RADIUS = 0.018;
 const RING_INNER = 0.018;
 const RING_OUTER = 0.024;
 
-// Construye/actualiza los dots dentro de `overlayGroup`. Reconstruye desde cero
+// Construye/actualiza los dots dentro de `parentGroup` (el zoomGroup de
+// vr-map-plano — HERMANO de overlayGroup, espacio base). Reconstruye desde cero
 // (limpia los anteriores) — se llama de forma throttleada (~1 Hz), es barato.
 // Devuelve un array de descriptores { subId, x, y } para el hit-test.
-export const buildDots = (THREE, overlayGroup, dotsGroupRef, scenes, activeLevel, activeSubId, W, H) => {
-  // Grupo contenedor propio (para no pisar la flecha ni el overlayMesh).
+export const buildDots = (THREE, parentGroup, dotsGroupRef, scenes, activeLevel, activeSubId, W, H) => {
+  // Grupo contenedor propio (para no pisar la flecha ni el overlay/base).
   let group = dotsGroupRef.current;
   if (!group) {
     group = new THREE.Group();
-    group.position.z = 0.005; // un pelo delante del plano del nivel
-    overlayGroup.add(group);
+    group.position.z = 0.0025; // entre el overlay (0.002) y la flecha (0.003)
+    parentGroup.add(group);
     dotsGroupRef.current = group;
   }
 
@@ -81,7 +84,7 @@ export const buildDots = (THREE, overlayGroup, dotsGroupRef, scenes, activeLevel
   return descriptors;
 };
 
-// Hit-test: dado un punto en coords locales del overlayGroup, devuelve el subId
+// Hit-test: dado un punto en coords locales del zoomGroup, devuelve el subId
 // del dot más cercano dentro de `hitRadius`, o null. Elige el más cercano por si
 // hay dots solapados.
 export const hitTestDot = (localPoint, dots, hitRadius) => {
