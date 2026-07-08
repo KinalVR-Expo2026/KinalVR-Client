@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { registerVRMapPlano } from '../aframe/vrMapPlano';
 import { useTourStore } from '../store/useTourStore';
 import { LEVEL_TO_NUM, LEVEL_PLAN_ASPECT_CSS } from '../constants/campusMap';
-import { VRBackdrop } from './VRBackdrop';
 import { VRLevelSelector } from './VRLevelSelector';
 
 // Mapa grande del campus dentro de VR (contraparte 3D del tab "Mapa" de
@@ -13,12 +12,16 @@ import { VRLevelSelector } from './VRLevelSelector';
 // Estructura: root (posición en el mundo + `billboard`, que solo escribe
 // rotation.y) > tiltGroup (rotation.x fijo, inclinación tipo mesa de dibujo,
 // sobrevive porque billboard no toca X) > contenido visual del panel
-// (atenuación, plano del mapa, catcher, selector de niveles). `VRBackdrop`
-// cuelga directo del root — es la cortina de cierre, no parte del panel — y
-// se cierra al tocar cualquier punto fuera de él, mismo patrón que
-// VREventDetailPanel. Sin marco/tarjeta ni título: el plano del mapa es el
-// protagonista, con una atenuación suave detrás para que no se pierda contra
-// el fondo 360. Una tarea posterior añade un zoomGroup dentro del tiltGroup.
+// (atenuación, plano del mapa, selector de niveles). Sin marco/tarjeta ni
+// título: el plano del mapa es el protagonista, con una atenuación suave
+// detrás para que no se pierda contra el fondo 360.
+//
+// Cierre: NO usa VRBackdrop (ese patrón de plano gigante detrás del panel
+// causaba el bug crítico — la mano que no apunta al panel casi siempre
+// apunta al backdrop, y su gatillo cerraba el mapa). En su lugar, un
+// listener de bajo nivel en las manos (triggerdown/pinchstarted) decide
+// cerrar solo si el rayo NO está tocando nada dentro del panel — ver el
+// efecto de cierre-por-fuera más abajo.
 //
 // El panel se coloca cerca y a la altura de los ojos del usuario para que se
 // sienta como sostener un mapa en las manos.
@@ -50,20 +53,12 @@ const BG_TOP = BG_CENTER_Y + BG_HEIGHT / 2;
 const BUTTON_X = MAP_WIDTH / 2 + 0.3;
 const BUTTON_STEP = 0.3;
 
-// Caja invisible que cubre TODO el panel (mapa + columna de botones + título).
-// Es clickable y "traga" los rayos que caen dentro del panel para que no lleguen
-// al backdrop de cierre que está detrás. Sin ella, como el mapa es transparente y
-// no clickable, el rayo lo atravesaba y golpeaba el backdrop → cerraba al tocar el
-// mapa. Con ella, SOLO los toques fuera del panel cierran. Va delante del backdrop
-// (z mayor) y detrás del mapa/botones (z menor) para no robarles el clic.
-const CATCHER_X_MIN = -BG_WIDTH / 2;
-const CATCHER_X_MAX = BUTTON_X + 0.19;
-const CATCHER_Y_MIN = BG_CENTER_Y - BG_HEIGHT / 2 - 0.05;
-const CATCHER_Y_MAX = BG_TOP + 0.28;
-const CATCHER_CX = (CATCHER_X_MIN + CATCHER_X_MAX) / 2;
-const CATCHER_CY = (CATCHER_Y_MIN + CATCHER_Y_MAX) / 2;
-const CATCHER_W = CATCHER_X_MAX - CATCHER_X_MIN;
-const CATCHER_H = CATCHER_Y_MAX - CATCHER_Y_MIN;
+// Ventana de gracia (ms) del cierre-por-fuera: el refresh escalonado de
+// raycasters (ver SceneViewer) tarda un poco en poner los botones/plano recién
+// montados en la whitelist del raycaster. Si el usuario gatilla al vacío antes
+// de que el refresh corra, la whitelist puede estar vacía y un rayo que en
+// realidad SÍ apunta al panel se leería como "afuera" → cierre falso al abrir.
+const CLOSE_GRACE_MS = 700;
 
 export const VRCampusMap = ({ cameraRef, onClose, onTeleport }) => {
   const rootRef = useRef(null);
@@ -123,25 +118,63 @@ export const VRCampusMap = ({ cameraRef, onClose, onTeleport }) => {
     return () => el.removeEventListener('map-teleport', handle);
   }, [onTeleport]);
 
+  // Cierre por toque afuera. Reemplaza el patrón VRBackdrop (plano gigante que
+  // "gana" cualquier gatillo de la mano que no apunta al panel) por un chequeo
+  // directo sobre lo que cada mano está apuntando: solo cierra si el objeto
+  // clickeable más cercano NO pertenece al panel (rootRef). Escucha a nivel de
+  // mano (triggerdown para mandos, pinchstarted para hand-tracking — las dos
+  // viven en las mismas entidades [laser-controls]/[hand-tracking-controls]).
+  useEffect(() => {
+    const openedAt = performance.now();
+    const hands = document.querySelectorAll('[laser-controls], [hand-tracking-controls]');
+    const uniqueHands = [...new Set(hands)];
+
+    const isInsidePanel = (el) => {
+      const root = rootRef.current;
+      return Boolean(root && el && (el === root || root.contains(el)));
+    };
+
+    const onTrigger = (evt) => {
+      const handEl = evt.currentTarget;
+      const ray = handEl.components?.raycaster;
+      if (!ray) return;
+      const els = ray.intersectedEls || [];
+
+      if (els.length === 0) {
+        // Rayo al vacío: cerrar solo pasada la ventana de gracia (si el
+        // refresh de raycasters aún no corrió, la whitelist puede estar
+        // vacía y esto sería un falso "afuera").
+        if (performance.now() - openedAt > CLOSE_GRACE_MS) onClose?.();
+        return;
+      }
+
+      const target = els[0];
+      // El minimapa de muñeca (solo la mano derecha lo apunta) ya tiene su
+      // propio toggle (vr-minimap-open) en SceneViewer. Si dejáramos que este
+      // efecto también cierre, el mismo gatillo dispararía cierre + toggle →
+      // neto reabrir. Se ignora explícitamente y se deja que el toggle actúe.
+      if (target.classList?.contains('vrmap-target')) return;
+
+      if (!isInsidePanel(target)) onClose?.();
+    };
+
+    uniqueHands.forEach((h) => {
+      h.addEventListener('triggerdown', onTrigger);
+      h.addEventListener('pinchstarted', onTrigger);
+    });
+    return () => uniqueHands.forEach((h) => {
+      h.removeEventListener('triggerdown', onTrigger);
+      h.removeEventListener('pinchstarted', onTrigger);
+    });
+  }, [onClose]);
+
   return (
     <a-entity ref={rootRef} billboard>
-      <VRBackdrop onClose={onClose} />
-
       {/* tiltGroup: inclina todo el panel visual como una mesa de dibujo
           técnico. `billboard` (en el root) solo escribe rotation.y, así que
           esta rotation.x sobrevive intacta. Una tarea posterior añade un
           zoomGroup dentro de este grupo. */}
       <a-entity ref={tiltGroupRef} rotation={`${PANEL_TILT_DEG} 0 0`}>
-        {/* Atrapa-rayos del panel: clickable, invisible, sin handler. Solo existe
-            para que los toques DENTRO del panel no lleguen al backdrop de cierre. */}
-        <a-plane
-          className="clickable"
-          width={CATCHER_W}
-          height={CATCHER_H}
-          position={`${CATCHER_CX} ${CATCHER_CY} -0.015`}
-          material="shader: flat; opacity: 0; transparent: true; side: double"
-        ></a-plane>
-
         {/* Atenuación suave detrás del plano — sin marco ni esquineros, solo
             para que el mapa no se pierda contra el fondo 360 */}
         <a-plane

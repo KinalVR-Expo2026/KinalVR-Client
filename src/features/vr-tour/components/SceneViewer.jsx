@@ -42,8 +42,11 @@ export const SceneViewer = () => {
   // controllers al entrar a VR) no siempre están listas en un único momento. Un
   // refresh de un solo disparo perdía la carrera y el minimapa de muñeca a veces
   // no quedaba apuntable hasta cambiar de escena (bug de apertura intermitente).
-  const scheduleStaggeredRefresh = useCallback(() => {
-    const timers = [150, 500, 1000, 1800].map((ms) => setTimeout(refreshRaycasters, ms));
+  // `delays` es configurable: la apertura del mapa VR usa una ventana más corta
+  // ([50, 250, 600]) que el default, porque su panel debe quedar apuntable antes
+  // de que el usuario alcance a gatillar (ver el efecto de isVRMapOpen abajo).
+  const scheduleStaggeredRefresh = useCallback((delays = [150, 500, 1000, 1800]) => {
+    const timers = delays.map((ms) => setTimeout(refreshRaycasters, ms));
     return () => timers.forEach(clearTimeout);
   }, [refreshRaycasters]);
 
@@ -75,6 +78,15 @@ export const SceneViewer = () => {
       window.removeEventListener('vr-map-toggle', toggle);
     };
   }, []);
+
+  // Al abrir el mapa VR sus botones/plano recién montados aún no están en la
+  // whitelist del raycaster (esta era la otra mitad del bug crítico: el rayo
+  // los atravesaba como si no existieran). Ventana corta porque VRCampusMap
+  // también tiene su propia ventana de gracia anti-carrera para el cierre.
+  useEffect(() => {
+    if (!isVRMapOpen) return;
+    return scheduleStaggeredRefresh([50, 250, 600]);
+  }, [isVRMapOpen, scheduleStaggeredRefresh]);
 
   if (loading && !isTransitioning) {
     return (
