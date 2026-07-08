@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { registerVRMapPlano } from '../aframe/vrMapPlano';
 import { useTourStore } from '../store/useTourStore';
-import { LEVEL_TO_NUM, LEVEL_PLAN_ASPECT_CSS } from '../constants/campusMap';
+import { LEVEL_TO_NUM, PANEL_HEIGHT, MAP_WIDTH } from '../constants/campusMap';
 import { VRLevelSelector } from './VRLevelSelector';
 
 // Mapa grande del campus dentro de VR (contraparte 3D del tab "Mapa" de
@@ -30,12 +30,9 @@ import { VRLevelSelector } from './VRLevelSelector';
 
 registerVRMapPlano();
 
-const PANEL_HEIGHT = 1.2;
-
-// Misma proporción que los 4 planos (invariante documentado en campusMap.js).
-const [ASPECT_W, ASPECT_H] = LEVEL_PLAN_ASPECT_CSS.split('/').map(Number);
-const MAP_ASPECT = ASPECT_W / ASPECT_H;
-export const MAP_WIDTH = PANEL_HEIGHT * MAP_ASPECT;
+// PANEL_HEIGHT y MAP_WIDTH viven en constants/campusMap.js (fuente única de
+// verdad) para que VRLevelSelector no tenga que importar este archivo y así
+// evitar el import circular VRCampusMap ↔ VRLevelSelector.
 
 // Distancia del panel frente a la cámara al abrir — calibrable 0.9-1.15.
 const PANEL_DISTANCE = 1.0;

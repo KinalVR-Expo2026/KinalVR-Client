@@ -88,6 +88,16 @@ export const SceneViewer = () => {
     return scheduleStaggeredRefresh([50, 250, 600]);
   }, [isVRMapOpen, scheduleStaggeredRefresh]);
 
+  // Callbacks estables para VRCampusMap: si se pasaran inline, cada re-render
+  // del padre crearía una función nueva, lo que (a) re-registra el listener
+  // `map-teleport` en vano y (b) reinicia la ventana de gracia del cierre-por-
+  // fuera (openedAt captura performance.now() en cada montaje del efecto).
+  const closeVRMap = useCallback(() => setIsVRMapOpen(false), []);
+  const teleportVRMap = useCallback((subId) => {
+    setIsVRMapOpen(false);
+    handleNavigationTransition(subId);
+  }, [handleNavigationTransition]);
+
   if (loading && !isTransitioning) {
     return (
       <div className="flex h-full w-full items-center justify-center font-[var(--font-sans)] text-white bg-black/50">
@@ -170,11 +180,8 @@ export const SceneViewer = () => {
         {isInVR && isVRMapOpen && (
           <VRCampusMap
             cameraRef={cameraRef}
-            onClose={() => setIsVRMapOpen(false)}
-            onTeleport={(subId) => {
-              setIsVRMapOpen(false);
-              handleNavigationTransition(subId);
-            }}
+            onClose={closeVRMap}
+            onTeleport={teleportVRMap}
           />
         )}
       </a-scene>

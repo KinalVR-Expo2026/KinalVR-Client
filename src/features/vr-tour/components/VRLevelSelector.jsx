@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MAP_WIDTH } from './VRCampusMap';
+import { MAP_WIDTH } from '../constants/campusMap';
 
 // Botón 3D clickeable (láser/pellizco), con el patrón ref + addEventListener que
 // usa el resto del tour (ver ConnectionMarker). Bloques sólidos en blanco; el

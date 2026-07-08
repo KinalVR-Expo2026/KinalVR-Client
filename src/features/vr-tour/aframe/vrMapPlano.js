@@ -144,7 +144,6 @@ export const registerVRMapPlano = () => {
       this.lastClickAt = 0;       // timestamp del último click (dedupe)
       this.dragHand = null;       // entidad de mano que sostiene el grip (o null)
       this.dragPrevPoint = null;  // punto local (padre del zoomGroup) del frame anterior
-      this._tmpV3 = new THREE.Vector3();
 
       // Listener de click del host: resuelve teleport (T8), doble-tap (zoom) o
       // simple tap (arma el doble-tap). Ver onHostClick.

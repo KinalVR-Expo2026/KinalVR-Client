@@ -17,6 +17,16 @@ export const LEVEL_PLANS = {
 // las calibraciones de BACKGROUND_CALIBRATION y este aspect ratio se desalinean.
 export const LEVEL_PLAN_ASPECT_CSS = '7500 / 5298';
 
+// Geometría del panel del mapa grande en VR (VRCampusMap). Fuente única de
+// verdad para que VRCampusMap y VRLevelSelector no se importen entre sí (evita
+// el ciclo de imports que tenían antes).
+export const PANEL_HEIGHT = 1.2;
+
+const [MAP_ASPECT_W, MAP_ASPECT_H] = LEVEL_PLAN_ASPECT_CSS.split('/').map(Number);
+export const MAP_ASPECT = MAP_ASPECT_W / MAP_ASPECT_H;
+
+export const MAP_WIDTH = PANEL_HEIGHT * MAP_ASPECT;
+
 // Calibración de los planos 2..4 sobre el lienzo del nivel 1 (que hace de base).
 // Estos offsets asumen que LEVEL_PLANS[2..4] comparten el mismo lienzo/aspect
 // ratio que LEVEL_PLANS[1] (ver LEVEL_PLAN_ASPECT_CSS arriba). Si alguno se
