@@ -116,7 +116,7 @@ export const MapInteractive = ({
 
       {/* Selector de niveles */}
       {isMapTab && (
-        <div className="flex flex-shrink-0 z-10 flex-col justify-center gap-2 border-l border-slate-200 bg-white/60 px-3 py-4">
+        <div className="flex flex-shrink-0 z-30 flex-col justify-center gap-2 border-slate-200 sm:bg-white/60 bg-white/80 px-3 py-4 sm:relative absolute right-4 bottom-4 sm:right-auto sm:bottom-auto rounded-xl sm:rounded-none shadow-lg sm:shadow-none border border-slate-200/50 sm:border-0 backdrop-blur-sm sm:backdrop-blur-none">
           {[4, 3, 2, 1].map((level) => (
             <button
               key={level}

@@ -47,7 +47,7 @@ const ClockFace = () => {
   }, [radius, numeralRadius]);
 
   return (
-    <div className="h-[280px] w-[280px] rounded-full animate-clock-fade-in md:h-[340px] md:w-[340px] lg:h-[480px] lg:w-[480px]">
+    <div className="h-[220px] w-[220px] rounded-full animate-clock-fade-in [@media(max-height:500px)]:h-[160px] [@media(max-height:500px)]:w-[160px] [@media(max-height:500px)]:opacity-30 md:h-[340px] md:w-[340px] lg:h-[480px] lg:w-[480px]">
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`}>
         <circle cx={radius} cy={radius} r={radius - 12} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
         <circle cx={radius} cy={radius} r={radius - 40} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
@@ -105,8 +105,8 @@ const TopBar = () => {
 
 const HeroContent = ({ onStart, isReady }) => {
   return (
-    <section className="relative z-10 flex flex-col items-center text-center animate-content-fade-in">
-      <div className="mb-4 flex h-8 w-8 items-center justify-center md:mb-6 md:h-10 md:w-10">
+    <section className="relative z-10 flex flex-col items-center text-center animate-content-fade-in [@media(max-height:500px)]:gap-0.5">
+      <div className="mb-2 [@media(max-height:500px)]:mb-1 flex h-8 w-8 items-center justify-center md:mb-6 md:h-10 md:w-10">
         <svg viewBox="0 0 100 100" className="h-full w-full fill-none stroke-[#e0e4eb] stroke-[1]">
           <path d="M50 5 L60 25 L80 20 L75 40 L95 50 L75 60 L80 80 L60 75 L50 95 L40 75 L20 80 L25 60 L5 50 L25 40 L20 20 L40 25 Z" />
           <text x="50" y="58" fontSize="30" textAnchor="middle" fill="#e0e4eb" stroke="none" fontFamily="'Cormorant Garamond', serif">
@@ -119,7 +119,7 @@ const HeroContent = ({ onStart, isReady }) => {
         Kinal
       </h1>
 
-      <p className="mb-10 mt-3 font-[var(--font-sans)] text-[11px] font-light uppercase tracking-[4px] text-white/60 md:mb-12 md:text-[12px] md:tracking-[6px]">
+      <p className="mb-6 [@media(max-height:500px)]:mb-4 mt-2 [@media(max-height:500px)]:mt-1 font-[var(--font-sans)] text-[11px] font-light uppercase tracking-[4px] text-white/60 md:mb-12 md:text-[12px] md:tracking-[6px]">
         Por el tiempo
       </p>
 

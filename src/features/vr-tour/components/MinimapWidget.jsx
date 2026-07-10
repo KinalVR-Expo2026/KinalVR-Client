@@ -13,7 +13,7 @@ export const MinimapWidget = ({ currentScene, onOpen }) => {
       type="button"
       onClick={onOpen}
       aria-label="Abrir mapa del campus"
-      className="absolute left-6 top-6 z-[99999] flex h-[200px] w-[200px] items-center justify-center overflow-hidden rounded-full border border-[#4b6ccc]/50 bg-[#0c0f1e]/80 shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300 hover:border-[#4b6ccc] hover:shadow-[0_0_18px_rgba(75,108,204,0.45)] active:scale-95 cursor-pointer animate-fade-in"
+      className="absolute sm:left-6 sm:top-6 left-4 top-4 z-[99999] flex sm:h-[200px] sm:w-[200px] h-[95px] w-[95px] items-center justify-center overflow-hidden rounded-full border border-[#4b6ccc]/50 bg-[#0c0f1e]/80 shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300 hover:border-[#4b6ccc] hover:shadow-[0_0_18px_rgba(75,108,204,0.45)] active:scale-95 cursor-pointer animate-fade-in"
     >
       {hasPosition && planoSrc ? (
         <div
@@ -73,7 +73,7 @@ export const MinimapWidget = ({ currentScene, onOpen }) => {
 
       {hasPosition && (
         <div
-          className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-7 w-7"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20 sm:h-7 sm:w-7 h-5.5 w-5.5"
           style={{ transform: 'translate(-50%, -50%) rotate(var(--minimap-rotation, 0deg))' }}
         >
           <MinimapArrow />

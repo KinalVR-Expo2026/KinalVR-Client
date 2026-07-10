@@ -17,7 +17,7 @@ export const EventModal = ({ modalEvent, onClose }) => {
         @keyframes shimmerGlow { 0%, 100% { box-shadow: 0 0 30px rgba(249,115,22,0.10), 0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06); } 50% { box-shadow: 0 0 45px rgba(249,115,22,0.18), 0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08); } }
       `}</style>
       <div
-        className="max-w-4xl w-full flex flex-col md:flex-row overflow-hidden cursor-default"
+        className="max-w-4xl w-full max-h-[88vh] md:max-h-none flex flex-col md:flex-row overflow-y-auto md:overflow-hidden cursor-default"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'linear-gradient(145deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.92) 50%, rgba(15,23,42,0.95) 100%)',
