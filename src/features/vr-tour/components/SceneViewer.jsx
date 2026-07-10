@@ -118,7 +118,7 @@ export const SceneViewer = () => {
   const skyAssetId = generateAssetId(textureUrl);
 
   return (
-    <div ref={wrapperRef} className="h-full w-full relative">
+    <div ref={wrapperRef} className="h-full w-full relative touch-none">
       <AdminOverlay
         scene={scene}
         events={events}
@@ -136,7 +136,7 @@ export const SceneViewer = () => {
         ref={sceneRef}
         embedded
         antialias="true"
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', touchAction: 'none' }}
         cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
         xr-mode-ui="enterVREnabled: true; enterAREnabled: false"
