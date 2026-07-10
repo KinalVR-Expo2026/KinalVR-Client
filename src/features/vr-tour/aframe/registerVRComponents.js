@@ -31,6 +31,37 @@ export const registerVRComponents = () => {
   const AFRAME = window.AFRAME;
   const THREE = window.THREE || AFRAME.THREE;
 
+  // Parche para habilitar la rotación vertical (pitch) al arrastrar el dedo en móviles
+  if (AFRAME.components['look-controls']) {
+    AFRAME.components['look-controls'].Component.prototype.onTouchMove = function (evt) {
+      if (!this.touchStarted || !this.data.touchEnabled) { return; }
+
+      var canvas = this.el.sceneEl.canvas;
+      var yawObject = this.yawObject;
+      var pitchObject = this.pitchObject;
+
+      // Movimiento horizontal (yaw)
+      var deltaX = 2 * Math.PI * (evt.touches[0].pageX - this.touchStart.x) / canvas.clientWidth;
+      // Movimiento vertical (pitch)
+      var deltaY = 2 * Math.PI * (evt.touches[0].pageY - this.touchStart.y) / canvas.clientHeight;
+
+      var direction = this.data.reverseTouchDrag ? 1 : -1;
+
+      // Aplicar rotaciones
+      yawObject.rotation.y -= deltaX * 0.5 * direction;
+      pitchObject.rotation.x -= deltaY * 0.5 * direction;
+
+      // Limitar pitch para no girar de cabeza (-90deg a 90deg)
+      var maxPitch = Math.PI / 2;
+      pitchObject.rotation.x = Math.max(-maxPitch, Math.min(maxPitch, pitchObject.rotation.x));
+
+      this.touchStart = {
+        x: evt.touches[0].pageX,
+        y: evt.touches[0].pageY
+      };
+    };
+  }
+
   if (!AFRAME.components['reload-on-a-button']) {
     AFRAME.registerComponent('reload-on-a-button', {
       init: function () {
