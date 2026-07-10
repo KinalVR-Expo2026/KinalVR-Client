@@ -66,3 +66,7 @@ body {
 		opacity: 1;
 	}
 }
+
+.a-canvas {
+	touch-action: none !important;
+}
