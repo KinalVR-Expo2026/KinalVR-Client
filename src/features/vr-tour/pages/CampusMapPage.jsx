@@ -136,6 +136,7 @@ export const CampusMapPage = ({ onClose, currentScene, onNavigate }) => {
           activeLevel={activeLevel}
           setActiveLevel={setActiveLevel}
           zoom={zoom}
+          setZoom={setZoom}
           handleMapClick={handleMapClick}
           tempPos={tempPos}
           tempAngle={tempAngle}

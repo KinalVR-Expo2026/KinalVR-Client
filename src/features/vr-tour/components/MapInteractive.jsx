@@ -6,6 +6,7 @@ export const MapInteractive = ({
   activeLevel,
   setActiveLevel,
   zoom,
+  setZoom,
   handleMapClick,
   tempPos,
   tempAngle,
@@ -17,11 +18,61 @@ export const MapInteractive = ({
   onTeleport,
 }) => {
   const [teleportTarget, setTeleportTarget] = useState(null);
+  const [touchState, setTouchState] = useState({
+    initialDistance: 0,
+    initialZoom: 100,
+    isPinching: false,
+  });
+
   const calc = activeLevel !== 1 ? BACKGROUND_CALIBRATION[activeLevel] : null;
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      e.stopPropagation();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setTouchState({
+        initialDistance: dist,
+        initialZoom: zoom,
+        isPinching: true,
+      });
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && touchState.isPinching) {
+      e.stopPropagation();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = dist / touchState.initialDistance;
+      const targetZoom = Math.round(touchState.initialZoom * factor);
+      const clampedZoom = Math.min(400, Math.max(50, targetZoom));
+      setZoom?.(clampedZoom);
+    } else if (e.touches.length === 1) {
+      // Evitar que arrastrar en el mapa gire el escenario 3D en el fondo
+      e.stopPropagation();
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchState.isPinching) {
+      e.stopPropagation();
+      setTouchState((prev) => ({ ...prev, isPinching: false }));
+    }
+  };
 
   return (
     <>
-      <div className="relative flex flex-1 min-w-0 overflow-auto p-6">
+      <div 
+        className="relative flex flex-1 min-w-0 overflow-auto p-6"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {isMapTab && (
           <div className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-semibold text-slate-500 shadow-sm">
             N

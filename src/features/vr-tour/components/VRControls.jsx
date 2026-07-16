@@ -8,7 +8,7 @@ import { registerVRMinimap } from '../aframe/vrMinimap';
 registerVRComponents();
 registerVRMinimap();
 
-export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
+export const VRControls = ({ cameraRef, cameraYaw, sceneOffset, isMapOpen }) => {
   const wrapperRef = useRef(null);
 
   // Sincronizar el yaw (rotación Y) sin que React sobreescriba cada frame
@@ -24,7 +24,7 @@ export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
       <a-entity
         camera
         ref={cameraRef}
-        look-controls="reverseMouseDrag: false; magicWindowTrackingEnabled: false; touchEnabled: true"
+        look-controls={`reverseMouseDrag: false; magicWindowTrackingEnabled: false; touchEnabled: ${!isMapOpen}`}
         position="0 1.75 0"
         minimap-sync
         data-offset={sceneOffset}

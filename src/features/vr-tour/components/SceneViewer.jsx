@@ -160,6 +160,7 @@ export const SceneViewer = () => {
           cameraYaw={cameraYaw}
           enableHandTracking={enableHandTracking}
           sceneOffset={scene.coordinacionAngulo || 0}
+          isMapOpen={isMapOpen}
         />
 
         {scene.conexiones.map((conexion, index) => (
