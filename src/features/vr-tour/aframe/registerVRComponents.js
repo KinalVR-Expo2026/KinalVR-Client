@@ -47,9 +47,9 @@ export const registerVRComponents = () => {
 
       var direction = this.data.reverseTouchDrag ? 1 : -1;
 
-      // Aplicar rotaciones (sensibilidad reducida de 0.5 a 0.2 para mayor suavidad táctil)
-      yawObject.rotation.y -= deltaX * 0.2 * direction;
-      pitchObject.rotation.x -= deltaY * 0.2 * direction;
+      // Aplicar rotaciones (sensibilidad restaurada a 0.5)
+      yawObject.rotation.y -= deltaX * 0.5 * direction;
+      pitchObject.rotation.x -= deltaY * 0.5 * direction;
 
       // Limitar pitch para no girar de cabeza (-90deg a 90deg)
       var maxPitch = Math.PI / 2;

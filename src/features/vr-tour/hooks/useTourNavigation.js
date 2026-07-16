@@ -46,7 +46,7 @@ export const useTourNavigation = () => {
         if (isMounted) {
           if (data) {
             if (!previousSubId.current && data.subId === 'entrada') {
-              setCameraYaw(180);
+              setCameraYaw(0);
             }
 
             if (data.conexiones && data.conexiones.length > 0) {
