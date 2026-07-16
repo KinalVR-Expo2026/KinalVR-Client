@@ -13,6 +13,7 @@ export const MapHeader = ({
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 bg-[#151a30] px-4 py-3 sm:px-6">
       <div className="flex items-center gap-4">
+        {/* 
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f9c846] font-[var(--font-display)] text-base font-semibold text-[#151a30]">
             K
@@ -24,6 +25,7 @@ export const MapHeader = ({
             </p>
           </div>
         </div>
+        */}
 
         {/* 
         <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
