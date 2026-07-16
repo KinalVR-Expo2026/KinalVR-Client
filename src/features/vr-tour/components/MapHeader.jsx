@@ -25,6 +25,7 @@ export const MapHeader = ({
           </div>
         </div>
 
+        {/* 
         <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
           {TABS.map((tab) => (
             <button
@@ -41,6 +42,7 @@ export const MapHeader = ({
             </button>
           ))}
         </div>
+        */}
       </div>
 
       {(isMapTab || isAdminTab) && (

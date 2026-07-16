@@ -136,8 +136,8 @@ export const MapInteractive = ({
 
       {/* Minimalist Confirmation Modal Overlay */}
       {teleportTarget && (
-        <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-auto animate-fade-in">
-          <div className="bg-slate-900/95 border border-white/10 rounded-2xl p-5 w-72 text-center shadow-2xl flex flex-col gap-4 animate-scale-up">
+        <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-auto animate-fast-fade-in">
+          <div className="bg-slate-900/95 border border-white/10 rounded-2xl p-5 w-72 text-center shadow-2xl flex flex-col gap-4 animate-fast-scale-up">
             <div>
               <h4 className="text-[10px] font-bold tracking-widest text-orange-500 uppercase">Confirmar Viaje</h4>
               <p className="text-sm font-semibold text-white mt-1.5">{teleportTarget.ubicacion}</p>

@@ -63,7 +63,7 @@ export const useTourStore = create((set, get) => ({
         const highResUrl = getHighResTextureUrl(scene.urlImagen);
         try {
           await preloadImage(lowResUrl);
-          preloadImage(highResUrl).catch(() => {});
+          await preloadImage(highResUrl).catch(() => {});
 
           set((state) => ({
             preloadedImages: addPreloadedImages(state.preloadedImages, lowResUrl, highResUrl)

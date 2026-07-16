@@ -88,6 +88,7 @@ const ClockFace = () => {
 const TopBar = () => {
   return (
     <header className="absolute left-6 right-6 top-6 z-20 flex items-start justify-between animate-fade-in md:left-10 md:right-10 md:top-10">
+      {/* 
       <button
         className="flex items-center gap-2 rounded-full border border-white/20 bg-transparent px-3 py-2 text-[10px] font-medium tracking-[1px] text-[#e0e4eb] backdrop-blur-[4px] transition-all duration-300 hover:border-white/40 hover:bg-white/5 sm:px-4 sm:py-2 sm:text-[11px]"
         type="button"
@@ -99,6 +100,7 @@ const TopBar = () => {
         </svg>
         MODO PC
       </button>
+      */}
     </header>
   );
 };

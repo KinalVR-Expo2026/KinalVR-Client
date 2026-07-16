@@ -22,7 +22,7 @@ export const SceneViewer = () => {
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isVRMapOpen, setIsVRMapOpen] = useState(false);
 
-  const { scene, loading, cameraYaw, isTransitioning, handleNavigationTransition, cameraRef } = useTourNavigation();
+  const { scene, loading, hasError, cameraYaw, isTransitioning, handleNavigationTransition, cameraRef } = useTourNavigation();
   const { events, eventsLoading, eventsError, activeSkyAssetId, allAssetsToLoad, updateEventCoords } = useSceneData(scene);
   const { isFullscreen, toggleFullscreen, enableHandTracking, isInVR } = useXR(wrapperRef, sceneRef, scene);
 
@@ -98,18 +98,24 @@ export const SceneViewer = () => {
     handleNavigationTransition(subId);
   }, [handleNavigationTransition]);
 
-  if (loading && !isTransitioning) {
+  if (hasError) {
     return (
-      <div className="flex h-full w-full items-center justify-center font-[var(--font-sans)] text-white bg-black/50">
-        <p className="animate-pulse tracking-[4px]">CARGANDO ENTORNO...</p>
+      <div className="flex h-full w-full items-center justify-center text-red-500">
+        <p>Error al cargar el escenario.</p>
       </div>
     );
   }
 
-  if (!scene) {
+  if (loading || !scene) {
     return (
-      <div className="flex h-full w-full items-center justify-center text-red-500">
-        <p>Error al cargar el escenario.</p>
+      <div className="flex h-full w-full items-center justify-center font-[var(--font-sans)] text-orange-500 bg-slate-950">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="animate-spin h-8 w-8 text-orange-500" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <p className="animate-pulse tracking-[4px] text-xs font-bold uppercase">Cargando Entorno...</p>
+        </div>
       </div>
     );
   }

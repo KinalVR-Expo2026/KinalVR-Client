@@ -60,6 +60,4 @@ export const planForScene = (scene) => {
 
 export const TABS = [
   { id: 'mapa', label: 'Mapa' },
-  { id: 'eventos', label: 'Eventos' },
-  { id: 'admin', label: 'Admin' },
 ];

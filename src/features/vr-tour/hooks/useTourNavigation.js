@@ -9,6 +9,7 @@ export const useTourNavigation = () => {
 
   const scene = useTourStore((state) => state.scenesCache[activeSubId]);
   const [loading, setLoading] = useState(!scene);
+  const [hasError, setHasError] = useState(false);
 
   const [pendingNextSubId, setPendingNextSubId] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -37,21 +38,27 @@ export const useTourNavigation = () => {
     const loadScene = async () => {
       if (activeSubId === pendingNextSubIdRef.current) return;
       if (!sceneRef.current && !isTransitioningRef.current) setLoading(true);
+      setHasError(false);
 
       try {
         const data = await fetchSceneData(activeSubId);
 
-        if (isMounted && data) {
-          if (!previousSubId.current && data.subId === 'entrada') {
-            setCameraYaw(180);
-          }
+        if (isMounted) {
+          if (data) {
+            if (!previousSubId.current && data.subId === 'entrada') {
+              setCameraYaw(180);
+            }
 
-          if (data.conexiones && data.conexiones.length > 0) {
-            preloadAdjacentScenes(data.conexiones);
+            if (data.conexiones && data.conexiones.length > 0) {
+              preloadAdjacentScenes(data.conexiones);
+            }
+          } else {
+            setHasError(true);
           }
         }
       } catch (error) {
         console.error("Fallo al cargar la escena de KinalVR", error);
+        if (isMounted) setHasError(true);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -114,6 +121,7 @@ export const useTourNavigation = () => {
   return {
     scene,
     loading,
+    hasError,
     cameraYaw,
     isTransitioning,
     handleNavigationTransition,

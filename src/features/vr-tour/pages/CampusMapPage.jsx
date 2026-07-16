@@ -131,47 +131,26 @@ export const CampusMapPage = ({ onClose, currentScene, onNavigate }) => {
       />
 
       {/* Cuerpo */}
-      {isMapTab || isAdminTab ? (
-        <>
-          <div className="relative flex flex-1 overflow-hidden">
-            {isAdminTab && (
-              <AdminSidebar
-                scenes={scenes}
-                selectedSubId={selectedSubId}
-                handleSelectScene={handleSelectScene}
-                tempPos={tempPos}
-                tempAngle={tempAngle}
-                setTempAngle={setTempAngle}
-                handleAngleChangeEnd={handleAngleChangeEnd}
-                savingStatus={savingStatus}
-              />
-            )}
+      <div className="relative flex flex-1 overflow-hidden">
+        <MapInteractive
+          activeLevel={activeLevel}
+          setActiveLevel={setActiveLevel}
+          zoom={zoom}
+          handleMapClick={handleMapClick}
+          tempPos={tempPos}
+          tempAngle={tempAngle}
+          isAdminTab={false}
+          isMapTab={true}
+          currentScene={currentScene}
+          userRotation={userRotation}
+          scenes={scenes}
+          onTeleport={handleTeleport}
+        />
+      </div>
 
-            <MapInteractive
-              activeLevel={activeLevel}
-              setActiveLevel={setActiveLevel}
-              zoom={zoom}
-              handleMapClick={handleMapClick}
-              tempPos={tempPos}
-              tempAngle={tempAngle}
-              isAdminTab={isAdminTab}
-              isMapTab={isMapTab}
-              currentScene={currentScene}
-              userRotation={userRotation}
-              scenes={scenes}
-              onTeleport={handleTeleport}
-            />
-          </div>
-
-          {isMapTab && (
-            <footer className="bg-[#dfe3ea] px-4 py-2 text-center text-[11px] text-slate-500">
-              Tocá un piso en el mapa para cambiar de nivel
-            </footer>
-          )}
-        </>
-      ) : (
-        <EventsList />
-      )}
+      <footer className="bg-[#dfe3ea] px-4 py-2 text-center text-[11px] text-slate-500">
+        Tocá un piso en el mapa para cambiar de nivel
+      </footer>
     </div>
   );
 };

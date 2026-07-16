@@ -25,7 +25,7 @@ export const VRControls = ({ cameraRef, cameraYaw, sceneOffset }) => {
         camera
         ref={cameraRef}
         look-controls="reverseMouseDrag: false; magicWindowTrackingEnabled: false; touchEnabled: true"
-        position="0 1.6 0"
+        position="0 1.75 0"
         minimap-sync
         data-offset={sceneOffset}
       ></a-entity>
