@@ -8,12 +8,13 @@ export const EventMarker = ({ event, onOpenModal, isHidden = false }) => {
   const markerRef = useRef(null);
   const imgRef = useRef(null);
   const [imgSize, setImgSize] = useState({ width: 0.75, height: 0.75 });
+  const [showDescription, setShowDescription] = useState(false);
 
   const isAdminMode = useTourStore((state) => state.isAdminMode);
   const selectedEventId = useTourStore((state) => state.selectedEventId);
   const setSelectedEventId = useTourStore((state) => state.setSelectedEventId);
 
-  const isSelected = isAdminMode && (selectedEventId === event._id);
+  const isSelected = isAdminMode && (selectedEventId === (event._id || event.id));
 
   // Refresh all raycasters when this marker mounts so VR controllers can detect it.
   // Events are loaded asynchronously via API, so these markers mount AFTER the initial
@@ -45,7 +46,7 @@ export const EventMarker = ({ event, onOpenModal, isHidden = false }) => {
     const handleInteraction = (e) => {
       e.stopPropagation();
       if (isAdminMode) {
-        setSelectedEventId(event._id);
+        setSelectedEventId(event._id || event.id);
       } else if (typeof onOpenModal === 'function') {
         onOpenModal(event);
       }
@@ -135,7 +136,8 @@ export const EventMarker = ({ event, onOpenModal, isHidden = false }) => {
         />
       )}
 
-      {event.descripcion ? (
+      {/* El texto flotante de descripción se ha desactivado por completo a petición del usuario
+      {event.descripcion && (showDescription || isSelected) ? (
         <a-text
           value={event.descripcion}
           align="center"
@@ -146,6 +148,7 @@ export const EventMarker = ({ event, onOpenModal, isHidden = false }) => {
           scale="0.65 0.65 0.65"
         />
       ) : null}
+      */}
 
       {isSelected && (
         <a-entity

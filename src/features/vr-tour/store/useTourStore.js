@@ -1,10 +1,30 @@
 import { create } from 'zustand';
 import { getSceneBySubId, updateScene } from '../../../shared/api/admin';
+import { getScenes } from '../../../shared/api/scenes';
 import { getHighResTextureUrl, getLowResTextureUrl, preloadImage } from '../../../shared/utils/imageUtils';
+
+const API_BASE_URL = import.meta.env.VITE_ADMIN_URL;
+
+// Tope de URLs de textura retenidas en preloadedImages. Cada una queda como <img>
+// dentro de <a-assets> (SceneViewer.jsx) mientras esté en esta lista, ocupando
+// memoria de GPU como textura. Sin límite, una sesión larga de kiosco acumula
+// las texturas de todas las escenas visitadas y nunca las libera.
+const MAX_PRELOADED_IMAGES = 24;
+
+const addPreloadedImages = (current, ...urls) => {
+  const merged = [...new Set([...current, ...urls])];
+  return merged.length > MAX_PRELOADED_IMAGES
+    ? merged.slice(merged.length - MAX_PRELOADED_IMAGES)
+    : merged;
+};
 
 export const useTourStore = create((set, get) => ({
   activeSubId: 'entrada',
   scenesCache: {},
+  // Índice global de escenas (todas, no solo las visitadas) — lo usan los puntos
+  // de teletransporte del mapa VR. Se rellena bajo demanda con fetchScenesIndex y
+  // se cachea para no re-pegarle al endpoint /scenes cada vez que se abre el mapa.
+  scenesIndex: null,
   isAdminMode: false,
   selectedConnectionId: null,
   selectedEventId: null,
@@ -16,6 +36,23 @@ export const useTourStore = create((set, get) => ({
   setSelectedConnectionId: (id) => set({ selectedConnectionId: id ? id.trim() : id, selectedEventId: null }),
   setSelectedEventId: (id) => set({ selectedEventId: id ? id.trim() : id, selectedConnectionId: null }),
 
+  // Devuelve el índice global de escenas (cacheado). Primera llamada: pega a
+  // GET /scenes?limite=1000; siguientes: devuelve la caché. En error: [] (los
+  // dots simplemente no aparecen, sin romper el mapa).
+  fetchScenesIndex: async () => {
+    const existing = get().scenesIndex;
+    if (Array.isArray(existing)) return existing;
+    try {
+      const scenes = await getScenes();
+      const list = Array.isArray(scenes) ? scenes : [];
+      set({ scenesIndex: list });
+      return list;
+    } catch (error) {
+      console.warn('No se pudo cargar el índice de escenas para el mapa VR:', error);
+      return [];
+    }
+  },
+
   preloadInitialScene: async (subId) => {
     const { fetchSceneData, preloadAdjacentScenes } = get();
     const scene = await fetchSceneData(subId);
@@ -26,10 +63,10 @@ export const useTourStore = create((set, get) => ({
         const highResUrl = getHighResTextureUrl(scene.urlImagen);
         try {
           await preloadImage(lowResUrl);
-          preloadImage(highResUrl).catch(() => {});
-          
+          await preloadImage(highResUrl).catch(() => {});
+
           set((state) => ({
-            preloadedImages: [...new Set([...state.preloadedImages, lowResUrl, highResUrl])]
+            preloadedImages: addPreloadedImages(state.preloadedImages, lowResUrl, highResUrl)
           }));
         } catch (error) {
           console.error("Fallo al pre-cargar la imagen inicial:", error);
@@ -47,7 +84,30 @@ export const useTourStore = create((set, get) => ({
     if (scenesCache[trimmedSubId]) return scenesCache[trimmedSubId];
 
     try {
+      // 1. Cargar datos base de la escena
       const data = await getSceneBySubId(trimmedSubId);
+
+      // 2. Cargar eventos asociados y empaquetarlos inmediatamente
+      let fetchedEvents = [];
+      if (data && (data._id || data.idEscenario)) {
+        const sceneId = data._id || data.idEscenario?._id || data.idEscenario;
+        try {
+          const response = await fetch(`${API_BASE_URL}/events/escenario/${sceneId}`);
+          if (response.ok) {
+            const eventData = await response.json();
+            fetchedEvents = Array.isArray(eventData.events) ? eventData.events :
+                            Array.isArray(eventData.eventos) ? eventData.eventos :
+                            Array.isArray(eventData) ? eventData : [];
+          }
+        } catch (err) {
+          console.error("Error al cargar eventos para la escena:", err);
+        }
+      }
+
+      if (data) {
+        data.eventos = fetchedEvents;
+      }
+
       set((state) => ({
         scenesCache: { ...state.scenesCache, [trimmedSubId]: data }
       }));
@@ -61,23 +121,33 @@ export const useTourStore = create((set, get) => ({
   preloadAdjacentScenes: async (conexiones) => {
     const { fetchSceneData } = get();
 
-    conexiones.forEach(async (conexion) => {
-      const targetId = conexion.targetSubId;
+    await Promise.all(
+      conexiones.map(async (conexion) => {
+        const targetId = conexion.targetSubId;
 
-      const sceneData = await fetchSceneData(targetId);
+        try {
+          const sceneData = await fetchSceneData(targetId);
 
-      if (sceneData && sceneData.urlImagen) {
-        const lowResUrl = getLowResTextureUrl(sceneData.urlImagen);
-        const highResUrl = getHighResTextureUrl(sceneData.urlImagen);
-        
-        preloadImage(lowResUrl).catch(() => { });
-        preloadImage(highResUrl).catch(() => { });
-        
-        set((state) => ({
-          preloadedImages: [...new Set([...state.preloadedImages, lowResUrl, highResUrl])]
-        }));
-      }
-    });
+          if (sceneData && sceneData.urlImagen) {
+            const lowResUrl = getLowResTextureUrl(sceneData.urlImagen);
+            const highResUrl = getHighResTextureUrl(sceneData.urlImagen);
+
+            await preloadImage(lowResUrl).catch((err) =>
+              console.warn(`No se pudo precargar la textura de baja resolución para "${targetId}":`, err)
+            );
+            preloadImage(highResUrl).catch((err) =>
+              console.warn(`No se pudo precargar la textura de alta resolución para "${targetId}":`, err)
+            );
+
+            set((state) => ({
+              preloadedImages: addPreloadedImages(state.preloadedImages, lowResUrl, highResUrl)
+            }));
+          }
+        } catch (error) {
+          console.error(`Error al precargar la escena adyacente "${targetId}":`, error);
+        }
+      })
+    );
   },
 
   updateConnectionCoords: (sceneSubId, targetSubId, { position, rotation }) => {
@@ -105,6 +175,104 @@ export const useTourStore = create((set, get) => ({
     });
   },
 
+  updateScenePositionInCache: (sceneSubId, position, angle) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return {};
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, posicion: position, coordinacionAngulo: angle }
+        }
+      };
+    });
+  },
+
+  addConnection: (sceneSubId, targetSubId) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    const tId = targetSubId ? targetSubId.trim() : targetSubId;
+
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+      
+      if (scene.conexiones && scene.conexiones.some(c => c.targetSubId === tId)) {
+        return { selectedConnectionId: tId, selectedEventId: null };
+      }
+
+      const newConnection = {
+        targetSubId: tId,
+        // Debe coincidir con el default del servidor (conexionSchema en scene.model.js)
+        position: '0 1 -3',
+        rotation: '0 0 0'
+      };
+
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, conexiones: [...(scene.conexiones || []), newConnection] }
+        },
+        selectedConnectionId: tId,
+        selectedEventId: null
+      };
+    });
+  },
+
+  removeConnection: (sceneSubId, targetSubId) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    const tId = targetSubId ? targetSubId.trim() : targetSubId;
+
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+
+      const filteredConexiones = (scene.conexiones || []).filter(c => c.targetSubId !== tId);
+
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, conexiones: filteredConexiones }
+        },
+        selectedConnectionId: state.selectedConnectionId === tId ? null : state.selectedConnectionId
+      };
+    });
+  },
+
+  // Guarda los metadatos editables del escenario (subId, ubicacion, urlImagen).
+  // Al cambiar subId hay que re-clavar la caché (que se indexa por subId) y, si es
+  // la escena activa, actualizar activeSubId para que siga visible.
+  saveSceneInfo: async (currentSubId, { subId, ubicacion, urlImagen }) => {
+    const curId = currentSubId ? currentSubId.trim() : currentSubId;
+    const { scenesCache } = get();
+    const scene = scenesCache[curId];
+    if (!scene || !scene._id) {
+      throw new Error("No hay datos del escenario o falta el ID del escenario");
+    }
+
+    const payload = {};
+    if (subId !== undefined) payload.subId = subId.trim();
+    if (ubicacion !== undefined) payload.ubicacion = ubicacion;
+    if (urlImagen !== undefined) payload.urlImagen = urlImagen;
+
+    const updatedScene = await updateScene(scene._id, payload);
+    // Los eventos vienen de un endpoint aparte y no los devuelve updateScene; conservarlos.
+    updatedScene.eventos = scene.eventos;
+
+    const newSubId = (updatedScene.subId || curId).trim();
+
+    set((state) => {
+      const newCache = { ...state.scenesCache };
+      delete newCache[curId];
+      newCache[newSubId] = updatedScene;
+      return {
+        scenesCache: newCache,
+        activeSubId: state.activeSubId === curId ? newSubId : state.activeSubId
+      };
+    });
+    return updatedScene;
+  },
+
   saveSceneConnections: async (sceneSubId) => {
     const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
     const { scenesCache } = get();
@@ -117,6 +285,8 @@ export const useTourStore = create((set, get) => ({
       const updatedScene = await updateScene(scene._id, {
         conexiones: scene.conexiones
       });
+      // Mantener los eventos cacheados al actualizar la escena
+      updatedScene.eventos = scene.eventos;
       set((state) => ({
         scenesCache: {
           ...state.scenesCache,
@@ -128,5 +298,55 @@ export const useTourStore = create((set, get) => ({
       console.error("Error al guardar conexiones en la base de datos:", error);
       throw error;
     }
+  },
+
+  addEventToSceneCache: (sceneSubId, event) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+      const updatedEvents = [...(scene.eventos || []), event];
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, eventos: updatedEvents }
+        }
+      };
+    });
+  },
+
+  removeEventFromSceneCache: (sceneSubId, eventId) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return state;
+      const updatedEvents = (scene.eventos || []).filter(e => (e._id || e.id) !== eventId);
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, eventos: updatedEvents }
+        }
+      };
+    });
+  },
+
+  updateEventInSceneCache: (sceneSubId, eventId, updatedFields) => {
+    const sId = sceneSubId ? sceneSubId.trim() : sceneSubId;
+    set((state) => {
+      const scene = state.scenesCache[sId];
+      if (!scene) return {};
+      const updatedEventos = (scene.eventos || []).map((e) => {
+        if ((e._id || e.id) === eventId) {
+          return { ...e, ...updatedFields };
+        }
+        return e;
+      });
+      return {
+        scenesCache: {
+          ...state.scenesCache,
+          [sId]: { ...scene, eventos: updatedEventos }
+        }
+      };
+    });
   }
 }));

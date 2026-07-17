@@ -9,6 +9,7 @@ export const useTourNavigation = () => {
 
   const scene = useTourStore((state) => state.scenesCache[activeSubId]);
   const [loading, setLoading] = useState(!scene);
+  const [hasError, setHasError] = useState(false);
 
   const [pendingNextSubId, setPendingNextSubId] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -17,26 +18,47 @@ export const useTourNavigation = () => {
   const previousSubId = useRef(null);
   const cameraRef = useRef(null);
 
+  // Espejos por ref de valores que el efecto de carga necesita leer pero que NO
+  // deben disparar una recarga de escena por sí solos (p.ej. `scene` cambia de
+  // referencia cada vez que se edita una conexión en modo admin, lo que antes
+  // volvía a ejecutar fetchSceneData/preloadAdjacentScenes en cada tecla).
+  // Se sincronizan en un efecto aparte (no durante el render) para no violar
+  // las reglas de refs de React.
+  const sceneRef = useRef(scene);
+  const isTransitioningRef = useRef(isTransitioning);
+  const pendingNextSubIdRef = useRef(pendingNextSubId);
+  useEffect(() => {
+    sceneRef.current = scene;
+    isTransitioningRef.current = isTransitioning;
+    pendingNextSubIdRef.current = pendingNextSubId;
+  }, [scene, isTransitioning, pendingNextSubId]);
+
   useEffect(() => {
     let isMounted = true;
     const loadScene = async () => {
-      if (activeSubId === pendingNextSubId) return;
-      if (!scene && !isTransitioning) setLoading(true);
+      if (activeSubId === pendingNextSubIdRef.current) return;
+      if (!sceneRef.current && !isTransitioningRef.current) setLoading(true);
+      setHasError(false);
 
       try {
         const data = await fetchSceneData(activeSubId);
 
-        if (isMounted && data) {
-          if (!previousSubId.current && data.subId === 'entrada') {
-            setCameraYaw(180);
-          }
+        if (isMounted) {
+          if (data) {
+            if (!previousSubId.current && data.subId === 'entrada') {
+              setCameraYaw(0);
+            }
 
-          if (data.conexiones && data.conexiones.length > 0) {
-            preloadAdjacentScenes(data.conexiones);
+            if (data.conexiones && data.conexiones.length > 0) {
+              preloadAdjacentScenes(data.conexiones);
+            }
+          } else {
+            setHasError(true);
           }
         }
       } catch (error) {
         console.error("Fallo al cargar la escena de KinalVR", error);
+        if (isMounted) setHasError(true);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -45,7 +67,9 @@ export const useTourNavigation = () => {
     loadScene();
 
     return () => { isMounted = false; };
-  }, [activeSubId, fetchSceneData, preloadAdjacentScenes, pendingNextSubId, isTransitioning, scene]);
+    // activeSubId es la única dependencia real de navegación; fetchSceneData y
+    // preloadAdjacentScenes son acciones estables de Zustand (no cambian de referencia).
+  }, [activeSubId, fetchSceneData, preloadAdjacentScenes]);
 
   const handleNavigationTransition = useCallback((targetId) => {
     if (!cameraRef.current || isTransitioning) return;
@@ -56,22 +80,32 @@ export const useTourNavigation = () => {
     // WebXR Safe Transition (Blink transition instead of FOV/Spheres to prevent A-Frame rendering bugs)
     setTimeout(() => {
       const nextScene = useTourStore.getState().scenesCache[targetId.trim()];
+      let targetYaw = 0;
+ 
       if (nextScene && nextScene.conexiones) {
         const backConnection = nextScene.conexiones.find(c => c.targetSubId?.trim() === activeSubId?.trim());
         if (backConnection && backConnection.rotation) {
           const yRot = parseFloat(backConnection.rotation.split(' ')[1]);
-          setCameraYaw((yRot + 180) % 360);
-        } else {
-          setCameraYaw(0);
+          targetYaw = (yRot + 180) % 360;
         }
       }
-
+ 
       // Reset internal look-controls ONLY if we are not in an active WebXR session
       const sceneEl = document.querySelector('a-scene');
       const cameraEl = cameraRef.current;
-      if (sceneEl && !sceneEl.is('vr-mode') && cameraEl && cameraEl.components['look-controls']) {
-        cameraEl.components['look-controls'].pitchObject.rotation.x = 0;
-        cameraEl.components['look-controls'].yawObject.rotation.y = 0;
+ 
+      if (sceneEl && sceneEl.is('vr-mode') && cameraEl) {
+        // Compensación de RV: Restamos la rotación física actual de la cabeza a la rotación objetivo
+        const THREE = window.THREE || window.AFRAME.THREE;
+        const headsetYaw = THREE.MathUtils.radToDeg(cameraEl.object3D.rotation.y);
+        setCameraYaw(targetYaw - headsetYaw);
+      } else {
+        // Comportamiento normal en PC
+        if (cameraEl && cameraEl.components['look-controls']) {
+          cameraEl.components['look-controls'].pitchObject.rotation.x = 0;
+          cameraEl.components['look-controls'].yawObject.rotation.y = 0;
+        }
+        setCameraYaw(targetYaw);
       }
 
       previousSubId.current = activeSubId;
@@ -80,13 +114,14 @@ export const useTourNavigation = () => {
 
       setTimeout(() => {
         setIsTransitioning(false);
-      }, 50); 
-    }, 150); 
+      }, 50);
+    }, 150);
   }, [isTransitioning, activeSubId, setActiveSubId]);
 
   return {
     scene,
     loading,
+    hasError,
     cameraYaw,
     isTransitioning,
     handleNavigationTransition,
